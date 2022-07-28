@@ -1,0 +1,31 @@
+[package]
+name = "indexer"
+version = "0.1.0"
+authors = ["Tonic Foundation <hello@tonic.foundation>"]
+edition = "2018"
+
+[dependencies]
+near-lake-framework = "0.5.0"
+
+# pin this version until we can update it in the dex
+near-sdk = "=4.0.0-pre.9"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.55"
+futures = "0.3.5"
+tokio = { version = "1.1", features = ["sync", "time", "macros", "rt-multi-thread"] }
+tokio-stream = { version = "0.1" }
+
+# app deps
+ansi_term = "0.12.1"
+anyhow = "1.0.52"
+bs58 = "0.4.0"
+clap = { version = "3.0.14", features = ["derive"] }
+tracing = "0.1.32"
+tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
+rand = { version = "0.8.5" }
+
+chrono = "0.4"
+diesel = { version = "1.4.8", features = ["chrono", "postgres", "r2d2"] }
+
+tonic-sdk = { git = "https://github.com/tonic-foundation/tonic-sdk-rs.git", branch = "master" }
