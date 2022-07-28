@@ -94,19 +94,19 @@ block number. If none is found, it starts from block 0. You can pass the
 contract was [deployed in block 66,296,455][tonic-deploy-block].
 
 ```bash
-# If you have Just
+# if you have Just
 just run --from-blockheight 66296455
 
-# Equivalently
+# or
 cargo run --release -- run --contract-ids $TONIC_CONTRACT_ID --from-blockheight 66296455
 ```
 
 For all future runs, the flag can be omitted
 
 ```bash
-# If you have Just
-just run --from-blockheight 66296455
+# if you have Just
+just run
 
-# Equivalently
-cargo run --release -- run --contract-ids $TONIC_CONTRACT_ID --from-blockheight 66296455
+# or
+cargo run --release -- run --contract-ids $TONIC_CONTRACT_ID
 ```
