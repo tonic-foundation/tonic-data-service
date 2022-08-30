@@ -1,0 +1,24 @@
+{
+  "extends": "@tsconfig/recommended/tsconfig.json",
+  "compilerOptions": {
+    "sourceMap": true,
+    "outDir": "./lib",
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitThis": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "declaration": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/": ["./*"]
+    }
+  },
+  "exclude": ["node_modules", "lib"],
+  "include": ["./src/**/*.ts"]
+}

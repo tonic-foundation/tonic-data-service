@@ -1,0 +1,22 @@
+{
+  "private": true,
+  "scripts": {
+    "api": "yarn workspace @tonic-foundation/data-api",
+    "client": "yarn workspace @tonic-foundation/data-client",
+    "build:all": "yarn workspaces foreach -pt run build",
+    "version:all": "yarn workspaces foreach version",
+    "publish:all": "npm publish --workspaces",
+    "docs:generate-client": "yarn typedoc --excludePrivate --includeVersion --out site/ packages/client/src/index.ts"
+  },
+  "workspaces": [
+    "packages/models",
+    "packages/api",
+    "packages/client",
+    "packages/*"
+  ],
+  "packageManager": "yarn@3.2.1",
+  "devDependencies": {
+    "typedoc": "^0.22.17",
+    "typescript": "^4.7.3"
+  }
+}
