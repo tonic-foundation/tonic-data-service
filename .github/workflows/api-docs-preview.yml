@@ -4,6 +4,10 @@ on:
   push:
     branches: [develop]
 
+defaults:
+  run:
+    working-directory: api
+
 jobs:
   publish-docs-preview:
     runs-on: ubuntu-latest
