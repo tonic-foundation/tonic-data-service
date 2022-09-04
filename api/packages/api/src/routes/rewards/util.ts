@@ -5,5 +5,5 @@ export interface Reward {
   account_id: string;
   reward: number;
   reward_date: Date;
-  paid: boolean;
+  paid_in_tx_id: string | null;
 }
