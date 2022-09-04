@@ -1,3 +1,6 @@
+/**
+ * Data routes. Backs the Tonic trading UI.
+ */
 import { FastifyInstance } from 'fastify';
 
 import stats from './stats';

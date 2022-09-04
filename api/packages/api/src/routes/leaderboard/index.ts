@@ -1,3 +1,4 @@
+// Leaderboard routes for trading competitions.
 import { FastifyInstance } from 'fastify';
 
 import rankings from './rankings';

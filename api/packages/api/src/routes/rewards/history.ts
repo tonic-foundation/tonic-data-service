@@ -1,8 +1,11 @@
 import { FastifyInstance } from 'fastify';
+import { Reward } from './util';
 
 const REWARDS_HISTORY_QUERY = `
 select
-  *
+  reward,
+  reward_date,
+  paid
 from
   rewards.payouts
 where
@@ -11,22 +14,12 @@ order by
   reward_date desc;
 `;
 
-interface Reward {
-  max_price_multiplier: number;
-  eligible_bp_distance: number;
-  time_divisor: number;
-  account_id: string;
-  reward: number;
-  reward_date: Date;
-  paid: boolean;
-}
-
 export default function (server: FastifyInstance, _: unknown, done: () => unknown) {
   server.route<{
     Querystring: { account?: string };
     Headers: unknown;
   }>({
-    url: '/rewards-history',
+    url: '/history',
     method: 'GET',
     schema: {
       querystring: {
@@ -49,8 +42,6 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
       }>(REWARDS_HISTORY_QUERY, {
         account,
       });
-
-      console.log(rows);
 
       if (rows.length) {
         resp.status(200).send(rows);
