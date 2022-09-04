@@ -1,0 +1,1 @@
+drop table competition.nft_holder;
