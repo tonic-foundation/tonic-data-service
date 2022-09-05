@@ -47,7 +47,8 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
         });
         if (rows.length) {
           res = rows[0];
-          server.cache.setTimed(cacheKey, res, 60_000 * 15);
+          // 15 minutes
+          server.cache.setTimed(cacheKey, res, 15 * 60_000);
         }
       }
 

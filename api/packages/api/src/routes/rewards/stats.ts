@@ -2,17 +2,17 @@
 // far, etc
 import { FastifyInstance } from 'fastify';
 
-/**
- * If the account earned no rewards on a given day, the row for that day will
- * simply be missing. Missing days are filled in on the frontend.
- */
+// TODO: maybe this should use the view and be cached?
 const STATS_QUERY = `
-with stats as (
+with live_payouts as (
+  select * from rewards.usn_rewards_calculator
+),
+stats as (
   select
     sum(reward) total_rewards,
     count(distinct account_id) total_participants
   from
-    rewards.payouts
+    live_payouts
 ),
 stats_per_day as (
   select
@@ -20,7 +20,7 @@ stats_per_day as (
     count(distinct account_id) daily_participants,
     reward_date
   from
-    rewards.payouts
+    live_payouts
   group by reward_date
 )
 select
@@ -109,9 +109,17 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
     method: 'GET',
     handler: async (_, resp) => {
       const { knex } = server;
-      const { rows } = await knex.raw<{ rows: StatsRow[] }>(STATS_QUERY);
 
-      resp.status(200).send(intoStats(rows));
+      const cacheKey = `rewards-stats`;
+      let res = server.cache.getTimed(cacheKey);
+      if (!res) {
+        const { rows } = await knex.raw<{ rows: StatsRow[] }>(STATS_QUERY);
+        res = intoStats(rows);
+        // 15 minutes
+        server.cache.setTimed(cacheKey, res, 15 * 60_000);
+      }
+
+      resp.status(200).send(res);
     },
   });
 
