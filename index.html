@@ -44,6 +44,20 @@ Have a self-signed Postgres cert?
 <pre><code class="language-bash"><span class="hl-6"># Add tokens used by the market. Tokens only need to be added once.</span><br/><span class="hl-1">NEAR_ENV=mainnet yarn api add-token --token_id usn </span><span class="hl-6"># token ID is contract ID</span><br/><span class="hl-1">NEAR_ENV=mainnet yarn api add-token --token_id near </span><span class="hl-6"># &quot;near&quot; allowed for native near</span><br/><br/><span class="hl-6"># Add market. Symbol must be lowercase.</span><br/><span class="hl-1">NEAR_ENV=mainnet yarn api add-market --market_id AAGR... --symbol foo/usdc</span><br/><br/><span class="hl-6"># Make it visible. Markets are invisible by default.</span><br/><span class="hl-1">yarn api set-visibility --symbol foo/usdc --visibility </span><span class="hl-4">true</span>
 </code></pre>
 
+<a href="#running-the-leaderboard" id="running-the-leaderboard" style="color: inherit; text-decoration: none;">
+  <h2>Running the leaderboard</h2>
+</a>
+<p>Leaderboard required manual setup for now. Read the migrations.</p>
+
+<a href="#running-a-rewards-program" id="running-a-rewards-program" style="color: inherit; text-decoration: none;">
+  <h2>Running a rewards program</h2>
+</a>
+<ul>
+<li>Update <code>scripts/rewards/set-params.sql</code> if necessary and run it.</li>
+<li>Run <code>scripts/rewards/init.sql</code> for your first batch of rewards---you must run this at least once.</li>
+<li>Run <code>scripts/rewards/update.sql</code> for each day of rewards&larr;untested, you may need to test this.</li>
+</ul>
+
 <a href="#known-issues" id="known-issues" style="color: inherit; text-decoration: none;">
   <h2>Known issues</h2>
 </a>
