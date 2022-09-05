@@ -81,6 +81,16 @@ NEAR_ENV=mainnet yarn api add-market --market_id AAGR... --symbol foo/usdc
 yarn api set-visibility --symbol foo/usdc --visibility true
 ```
 
+## Running the leaderboard
+
+Leaderboard required manual setup for now. Read the migrations.
+
+## Running a rewards program
+
+- Update `scripts/rewards/set-params.sql` if necessary and run it.
+- Run `scripts/rewards/init.sql` for your first batch of rewards---you must run this at least once.
+- Run `scripts/rewards/update.sql` for each day of rewards&larr;untested, you may need to test this.
+
 ## Known issues
 
 - Migrations are all in the indexer repo. We'll combine the two repos in the future.

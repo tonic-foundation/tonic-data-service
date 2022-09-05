@@ -1,5 +1,5 @@
 // Overall stats about the competition, including start time, total rewards so
-// far, etc
+// far, distinct users, etc
 import { FastifyInstance } from 'fastify';
 
 // TODO: maybe this should use the view and be cached?

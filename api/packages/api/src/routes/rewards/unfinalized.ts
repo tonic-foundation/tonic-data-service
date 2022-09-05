@@ -1,4 +1,4 @@
-// Non-finalized rewards for the current UTC day, computed using the view and
+// Unfinalized rewards for the current UTC day, computed using the view and
 // cached for ~15 minutes per user.
 import { FastifyInstance } from 'fastify';
 import { Reward } from './util';
