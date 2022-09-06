@@ -2,12 +2,14 @@
 // far, distinct users, etc
 import { FastifyInstance } from 'fastify';
 
+// was doing live payouts but parameters change daily at the
+// *end of the day* based on volume, so can't use that
 const STATS_QUERY = `
-with live_payouts as (
+with all_payouts as (
   select
     *
   from
-    rewards.usn_rewards_calculator
+    rewards.payouts
   cross join
     rewards.const const
   where
@@ -18,7 +20,7 @@ stats as (
     sum(reward) total_rewards,
     count(distinct account_id) total_participants
   from
-    live_payouts
+    all_payouts
 ),
 stats_per_day as (
   select
@@ -26,7 +28,7 @@ stats_per_day as (
     count(distinct account_id) daily_participants,
     reward_date
   from
-    live_payouts
+    all_payouts
   group by reward_date
 )
 select
