@@ -15,7 +15,7 @@ with total_payments_per_account as (
   group by account_id
 )
 select
-  -- we join the total in just so we can get the summary in one query
+  -- join the total so we can get the summary in one query
   tppa.total,
   reward,
   reward_date,
@@ -26,14 +26,39 @@ from
   on p.account_id = tppa.account_id
 where
   tppa.account_id = :account
-order by reward_date desc;
+order by reward_date asc;
 `;
 
-export interface RewardsSummary {
+export interface RewardEntry {
   total: number;
   reward: number;
   reward_date: Date;
   paid_in_tx_id: string | null;
+}
+
+export interface RewardsHistory {
+  total: number;
+  rewards: Omit<RewardEntry, 'total'>[];
+}
+
+function intoHistory(entries: RewardEntry[]): RewardsHistory {
+  if (!entries.length) {
+    return {
+      total: 0,
+      rewards: [],
+    };
+  }
+
+  return {
+    total: entries[0].total,
+    rewards: entries.map((e) => {
+      return {
+        reward: e.reward,
+        reward_date: e.reward_date,
+        paid_in_tx_id: e.paid_in_tx_id,
+      };
+    }),
+  };
 }
 
 export default function (server: FastifyInstance, _: unknown, done: () => unknown) {
@@ -60,13 +85,13 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
 
       const { knex } = server;
       const { rows } = await knex.raw<{
-        rows: RewardsSummary[];
+        rows: RewardEntry[];
       }>(REWARDS_SUMMARY_QUERY, {
         account,
       });
 
       if (rows.length) {
-        resp.status(200).send(rows);
+        resp.status(200).send(intoHistory(rows));
       } else {
         resp.status(404);
       }

@@ -2,10 +2,16 @@
 // far, distinct users, etc
 import { FastifyInstance } from 'fastify';
 
-// TODO: maybe this should use the view and be cached?
 const STATS_QUERY = `
 with live_payouts as (
-  select * from rewards.usn_rewards_calculator
+  select
+    *
+  from
+    rewards.usn_rewards_calculator
+  cross join
+    rewards.const const
+  where
+    reward_date >= const.start_date
 ),
 stats as (
   select

@@ -14,7 +14,7 @@ create temporary table previous as (
         1
 );
 
--- delete the most recent record. unsure if this is necessary.
+-- optional: delete the most recent record. unsure if this is necessary.
 -- uncomment if you get unique contrainst violations on the payouts table
 -- delete from
 --     rewards.payouts using previous
