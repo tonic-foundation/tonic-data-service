@@ -4,10 +4,22 @@ import { FastifyInstance } from 'fastify';
 import { Reward } from './util';
 
 const REWARDS_TODAY_QUERY = `
+with all_unfinalized as (
+  select
+    sum(reward) total_unfinalized
+  from
+    rewards.usn_rewards_calculator
+  where reward_date = date(now())
+)
 select
-  *
+  account_id,
+  au.total_unfinalized,
+  reward_date,
+  reward account_unfinalized
 from
   rewards.usn_rewards_calculator
+cross join
+  all_unfinalized au
 where
   account_id = :account
   and reward_date = date(now());
@@ -55,7 +67,12 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
       if (res) {
         resp.status(200).send(res);
       } else {
-        resp.status(404);
+        resp.status(404).send({
+          account_id: account,
+          total_unfinalized: '0', // idk
+          reward_date: new Date(),
+          account_unfinalized: '0',
+        });
       }
     },
   });
