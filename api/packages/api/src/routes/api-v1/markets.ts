@@ -19,25 +19,27 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
     },
     handler: async (_, response) => {
       const key = 'markets-list';
-      let markets = server.cache.getTimed(key);
-      if (!markets) {
-        markets = await server
-          .knex<Market>('market')
-          .select(
-            'id',
-            'symbol',
-            'created_at',
-            'base_token_id',
-            'quote_token_id',
-            'base_decimals',
-            'quote_decimals',
-            'base_lot_size',
-            'quote_lot_size'
-          )
-          .where('visible', true)
-          .orderBy('symbol', 'desc');
-        server.cache.setTimed(key, markets, 60_000);
-      }
+      const markets = await server.withCache({
+        key,
+        ttl: 15 * 60_000,
+        async get() {
+          return await server
+            .knex<Market>('market')
+            .select(
+              'id',
+              'symbol',
+              'created_at',
+              'base_token_id',
+              'quote_token_id',
+              'base_decimals',
+              'quote_decimals',
+              'base_lot_size',
+              'quote_lot_size'
+            )
+            .where('visible', true)
+            .orderBy('symbol', 'desc');
+        },
+      });
 
       response.status(200).send({ markets: markets || [] });
     },

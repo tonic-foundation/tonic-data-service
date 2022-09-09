@@ -63,21 +63,20 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
       }
       const { priceStringToNumber, quantityStringToNumber } = tools;
 
-      const statsCacheKey = `market-stats-${market}`;
-      const ttl = 10_000; // 10 seconds
-
-      let stats: MarketStats24h | undefined = server.cache.getTimed(statsCacheKey);
-      if (!stats) {
-        const rawStats: ForceProperties<MarketStats24h, string> = await knex.first(knex.raw(STATS_QUERY, { market }));
-        stats = {
-          high: priceStringToNumber(rawStats.high),
-          low: priceStringToNumber(rawStats.low),
-          latest: priceStringToNumber(rawStats.latest),
-          previous: priceStringToNumber(rawStats.previous),
-          quantity: quantityStringToNumber(rawStats.quantity) || 0,
-        };
-        server.cache.setTimed(statsCacheKey, stats, ttl);
-      }
+      const stats = await server.withCache({
+        key: `market-stats-${market}`,
+        ttl: 30 * 1000,
+        async get(): Promise<MarketStats24h> {
+          const rawStats: ForceProperties<MarketStats24h, string> = await knex.first(knex.raw(STATS_QUERY, { market }));
+          return {
+            high: priceStringToNumber(rawStats.high),
+            low: priceStringToNumber(rawStats.low),
+            latest: priceStringToNumber(rawStats.latest),
+            previous: priceStringToNumber(rawStats.previous),
+            quantity: quantityStringToNumber(rawStats.quantity) || 0,
+          };
+        },
+      });
 
       response.status(200).send({ stats });
     },

@@ -12,12 +12,13 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
     url: '/tokens',
     method: 'GET',
     handler: async (_, response) => {
-      const key = 'token-list';
-      let tokens = server.cache.getTimed(key);
-      if (!tokens) {
-        tokens = await server.knex<Nep141Token>('nep_141_token').select('id');
-        server.cache.setTimed(key, tokens, 60_000);
-      }
+      const tokens = await server.withCache({
+        key: 'api-v1-supported-tokens',
+        ttl: 15 * 60_000,
+        async get() {
+          return await server.knex<Nep141Token>('nep_141_token').select('id');
+        },
+      });
       response.status(200).send({ tokens });
     },
   });

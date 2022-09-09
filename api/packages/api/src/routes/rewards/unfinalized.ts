@@ -84,32 +84,32 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
 
       const { knex } = server;
 
-      const cacheKey = `rewards-unfinalized-with-ranking-${account}`;
-      let res = server.cache.getTimed<UnfinalizedRanking[]>(cacheKey);
-      if (!res) {
-        const { rows } = await knex.raw<{
-          rows: UnfinalizedRanking[];
-        }>(REWARDS_TODAY_QUERY, {
-          account,
-        });
+      const res = await server.withCache({
+        key: `rewards-unfinalized-with-ranking-${account}`,
+        ttl: 15 * 60_000,
+        async get() {
+          const { rows } = await knex.raw<{
+            rows: UnfinalizedRanking[];
+          }>(REWARDS_TODAY_QUERY, {
+            account,
+          });
 
-        if (rows.length) {
-          if (!rows.find((r) => r.account_id === account)) {
-            // missing = they have no activity today. push them in unranked with
-            // default values. a 0 default value makes client code way simpler
-            rows.push({
-              account_id: account,
-              account_unfinalized: '0',
-              overall_rank: '0',
-              total_unfinalized: rows[0].total_unfinalized,
-            });
+          if (rows.length) {
+            if (!rows.find((r) => r.account_id === account)) {
+              // missing = they have no activity today. push them in unranked with
+              // default values. a 0 default value makes client code way simpler
+              rows.push({
+                account_id: account,
+                account_unfinalized: '0',
+                overall_rank: '0',
+                total_unfinalized: rows[0].total_unfinalized,
+              });
+            }
           }
 
-          res = rows;
-          // 15 minutes
-          server.cache.setTimed(cacheKey, res, 15 * 60_000);
-        }
-      }
+          return rows;
+        },
+      });
 
       if (res) {
         resp.status(200).send(res);

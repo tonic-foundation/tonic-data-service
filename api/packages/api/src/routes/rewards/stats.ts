@@ -118,14 +118,14 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
     handler: async (_, resp) => {
       const { knex } = server;
 
-      const cacheKey = `rewards-stats`;
-      let res = server.cache.getTimed(cacheKey);
-      if (!res) {
-        const { rows } = await knex.raw<{ rows: StatsRow[] }>(STATS_QUERY);
-        res = intoStats(rows);
-        // 15 minutes
-        server.cache.setTimed(cacheKey, res, 15 * 60_000);
-      }
+      const res = await server.withCache({
+        key: `rewards-stats`,
+        ttl: 15 * 60_000,
+        async get() {
+          const { rows } = await knex.raw<{ rows: StatsRow[] }>(STATS_QUERY);
+          return intoStats(rows);
+        },
+      });
 
       resp.status(200).send(res);
     },

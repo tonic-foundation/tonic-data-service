@@ -12,6 +12,12 @@ export interface CacheService {
 declare module 'fastify' {
   interface FastifyInstance {
     cache: CacheService;
+    /**
+     * Try to get using the cache key, or produce the value with
+     * the getter if not cached. Option TTL; default is cached
+     * until the process ends.
+     */
+    withCache<T = any>(opts: { key: string; get: () => Promise<T>; ttl?: number }): Promise<T>;
   }
 }
 
@@ -51,6 +57,21 @@ function cachePlugin(fastify: FastifyInstance, _: unknown, next: () => unknown) 
   };
 
   fastify.decorate('cache', cacheService);
+  fastify.decorate('withCache', async function <T = any>(opts: { key: string; get: () => Promise<T>; ttl?: number }) {
+    const { key, get, ttl } = opts;
+    let ret = ttl ? fastify.cache.getTimed(key) : fastify.cache.get(key);
+
+    if (!ret) {
+      ret = await get();
+      if (ttl) {
+        fastify.cache.setTimed(key, ret, ttl);
+      } else {
+        fastify.cache.set(key, ret);
+      }
+    }
+
+    return ret;
+  });
 
   next();
 }
