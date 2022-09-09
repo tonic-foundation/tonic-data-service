@@ -8,15 +8,15 @@
 -- -- the lower this is, the more we reward length of time on orderbook
 -- 4 :: numeric time_divisor
 update
-    rewards.params
+  rewards.params
 set
-    eligible_bp_distance = 10
+  eligible_bp_distance = 10
 where
-    true;
+  true;
 
 update
-    rewards.const
+  rewards.const
 set
- start_date = date('2022-08-01 16:00:00' :: timestamp)
+  start_date = date('2022-08-01 16:00:00' :: timestamp)
 where
-    true;
+  true;

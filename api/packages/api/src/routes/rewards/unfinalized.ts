@@ -1,29 +1,64 @@
 // Unfinalized rewards for the current UTC day, computed using the view and
 // cached for ~15 minutes per user.
+// TODO XXX FIXME: remove the interval '1 day' stuff, it's just for testing
 import { FastifyInstance } from 'fastify';
-import { Reward } from './util';
 
 const REWARDS_TODAY_QUERY = `
-with all_unfinalized as (
+with total_unfinalized as (
   select
     sum(reward) total_unfinalized
   from
     rewards.usn_rewards_calculator
-  where reward_date = date(now())
+  where reward_date = date(now() - interval '2 day')
+),
+all_unfinalized_rewards as (
+  select
+    account_id,
+    tu.total_unfinalized,
+    reward account_unfinalized
+  from
+    rewards.usn_rewards_calculator
+  cross join
+    total_unfinalized tu
+  where
+    reward_date = date(now() - interval '2 day')
+),
+unfinalized_rankings as (
+  select
+    *,
+    dense_rank() over(
+      order by
+        au.account_unfinalized desc,
+        au.account_id
+    ) as overall_rank
+  from 
+    all_unfinalized_rewards au
 )
 select
-  account_id,
-  au.total_unfinalized,
-  reward_date,
-  reward account_unfinalized
+  *
 from
-  rewards.usn_rewards_calculator
-cross join
-  all_unfinalized au
+  unfinalized_rankings
 where
+  overall_rank <= 3
+or
   account_id = :account
-  and reward_date = date(now());
+order by overall_rank asc;
 `;
+
+// query result looks like this
+//
+// it always returns up to the top 3 by points earned, and the account being
+// requested. if the account is in the top 3, it won't be duplicated
+//
+// account_id | total_unfinalized | account_unfinalized | overall_rank
+// ------------+-------------------+---------------------+--------------
+//  tng02.near |            0.1444 |              0.1413 |            1
+interface UnfinalizedRanking {
+  account_id: string;
+  total_unfinalized: string;
+  account_unfinalized: string;
+  overall_rank: string;
+}
 
 export default function (server: FastifyInstance, _: unknown, done: () => unknown) {
   server.route<{
@@ -49,16 +84,28 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
 
       const { knex } = server;
 
-      const cacheKey = `rewards-unfinalized-${account}`;
-      let res = server.cache.getTimed<Reward>(cacheKey);
+      const cacheKey = `rewards-unfinalized-with-ranking-${account}`;
+      let res = server.cache.getTimed<UnfinalizedRanking[]>(cacheKey);
       if (!res) {
         const { rows } = await knex.raw<{
-          rows: Reward[];
+          rows: UnfinalizedRanking[];
         }>(REWARDS_TODAY_QUERY, {
           account,
         });
+
         if (rows.length) {
-          res = rows[0];
+          if (!rows.find((r) => r.account_id === account)) {
+            // missing = they have no activity today. push them in unranked with
+            // default values. a 0 default value makes client code way simpler
+            rows.push({
+              account_id: account,
+              account_unfinalized: '0',
+              overall_rank: '0',
+              total_unfinalized: rows[0].total_unfinalized,
+            });
+          }
+
+          res = rows;
           // 15 minutes
           server.cache.setTimed(cacheKey, res, 15 * 60_000);
         }
@@ -67,12 +114,15 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
       if (res) {
         resp.status(200).send(res);
       } else {
-        resp.status(404).send({
-          account_id: account,
-          total_unfinalized: '0', // idk
-          reward_date: new Date(),
-          account_unfinalized: '0',
-        });
+        // no activity yet today
+        resp.status(200).send([
+          {
+            account_id: account,
+            account_unfinalized: '0',
+            overall_rank: '0',
+            total_unfinalized: '0',
+          },
+        ] as UnfinalizedRanking[]);
       }
     },
   });

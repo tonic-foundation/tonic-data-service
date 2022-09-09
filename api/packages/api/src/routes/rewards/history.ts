@@ -93,7 +93,7 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
       if (rows.length) {
         resp.status(200).send(intoHistory(rows));
       } else {
-        resp.status(404);
+        resp.status(404).send();
       }
     },
   });
