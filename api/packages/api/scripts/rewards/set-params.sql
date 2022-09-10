@@ -7,10 +7,12 @@
 -- 4 :: numeric eligible_bp_distance,
 -- -- the lower this is, the more we reward length of time on orderbook
 -- 4 :: numeric time_divisor
+-- 0 :: numeric rewards_pool
 update
   rewards.params
 set
-  eligible_bp_distance = 10
+  eligible_bp_distance = 10,
+  rewards_pool = 250
 where
   true;
 

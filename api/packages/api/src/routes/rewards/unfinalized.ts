@@ -6,7 +6,7 @@ import { FastifyInstance } from 'fastify';
 const REWARDS_TODAY_QUERY = `
 with total_unfinalized as (
   select
-    sum(reward) total_unfinalized
+    sum(points) total_unfinalized
   from
     rewards.usn_rewards_calculator
   where reward_date = date(now() - interval '2 day')
@@ -15,7 +15,7 @@ all_unfinalized_rewards as (
   select
     account_id,
     tu.total_unfinalized,
-    reward account_unfinalized
+    points account_unfinalized
   from
     rewards.usn_rewards_calculator
   cross join
@@ -86,7 +86,7 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
 
       const res = await server.withCache({
         key: `rewards-unfinalized-with-ranking-${account}`,
-        ttl: 15 * 60_000,
+        ttl: 5 * 60_000,
         async get() {
           const { rows } = await knex.raw<{
             rows: UnfinalizedRanking[];
@@ -94,36 +94,22 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
             account,
           });
 
-          if (rows.length) {
-            if (!rows.find((r) => r.account_id === account)) {
-              // missing = they have no activity today. push them in unranked with
-              // default values. a 0 default value makes client code way simpler
-              rows.push({
-                account_id: account,
-                account_unfinalized: '0',
-                overall_rank: '0',
-                total_unfinalized: rows[0].total_unfinalized,
-              });
-            }
+          // if there's no activity for this account, push a default value.
+          // if there's no trading activity at all, push a default value.
+          if (!rows.length || !rows.find((r) => r.account_id === account)) {
+            rows.push({
+              account_id: account,
+              account_unfinalized: '0',
+              overall_rank: '0',
+              total_unfinalized: rows[0]?.total_unfinalized || '0',
+            });
           }
 
           return rows;
         },
       });
 
-      if (res) {
-        resp.status(200).send(res);
-      } else {
-        // no activity yet today
-        resp.status(200).send([
-          {
-            account_id: account,
-            account_unfinalized: '0',
-            overall_rank: '0',
-            total_unfinalized: '0',
-          },
-        ] as UnfinalizedRanking[]);
-      }
+      resp.status(200).send(res);
     },
   });
 

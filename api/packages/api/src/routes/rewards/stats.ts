@@ -17,14 +17,14 @@ with all_payouts as (
 ),
 stats as (
   select
-    sum(reward) total_rewards,
+    sum(payout) total_payouts,
     count(distinct account_id) total_participants
   from
     all_payouts
 ),
 stats_per_day as (
   select
-    sum(reward) daily_rewards,
+    sum(payout) daily_payouts,
     count(distinct account_id) daily_participants,
     reward_date
   from
@@ -32,11 +32,11 @@ stats_per_day as (
   group by reward_date
 )
 select
-  s.total_rewards,
+  s.total_payouts,
   s.total_participants,
   const.start_date,
   spd.reward_date,
-  spd.daily_rewards,
+  spd.daily_payouts,
   spd.daily_participants
 from
   stats_per_day spd
@@ -50,7 +50,7 @@ interface StatsRow {
   /**
    * Total since start of program, paid or pending.
    */
-  total_rewards: number;
+  total_payouts: number;
 
   /**
    * Distinct participants with reward earned on at least one day.
@@ -70,7 +70,7 @@ interface StatsRow {
   /**
    * Total rewards earned on `reward_date`.
    */
-  daily_rewards: number;
+  daily_payouts: number;
 
   /**
    * Total distinct participants who earned any reward on `reward_date`.
@@ -79,16 +79,16 @@ interface StatsRow {
 }
 
 export interface Stats {
-  total_rewards: number;
+  total_payouts: number;
   total_participants: number;
   start_date: Date;
-  daily_stats: Pick<StatsRow, 'reward_date' | 'daily_rewards' | 'daily_participants'>[];
+  daily_stats: Pick<StatsRow, 'reward_date' | 'daily_payouts' | 'daily_participants'>[];
 }
 
 function intoStats(rows: StatsRow[]): Stats {
   if (!rows.length) {
     return {
-      total_rewards: 0,
+      total_payouts: 0,
       total_participants: 0,
       start_date: new Date(), // wrong but whatever
       daily_stats: [],
@@ -96,13 +96,13 @@ function intoStats(rows: StatsRow[]): Stats {
   }
 
   return {
-    total_rewards: rows[0].total_rewards,
+    total_payouts: rows[0].total_payouts,
     total_participants: rows[0].total_participants,
     start_date: rows[0].start_date,
     // assume this is in date order due to the query
     daily_stats: rows.map((r) => ({
       daily_participants: r.daily_participants,
-      daily_rewards: r.daily_rewards,
+      daily_payouts: r.daily_payouts,
       reward_date: r.reward_date,
     })),
   };

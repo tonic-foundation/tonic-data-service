@@ -9,7 +9,7 @@ const REWARDS_SUMMARY_QUERY = `
 with total_payments_per_account as (
   select
     account_id,
-    sum(reward) total
+    sum(payout) total
   from
     rewards.payouts
   group by account_id
@@ -17,7 +17,7 @@ with total_payments_per_account as (
 select
   -- join the total so we can get the summary in one query
   tppa.total,
-  reward,
+  payout,
   reward_date,
   paid_in_tx_id
 from
@@ -93,7 +93,10 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
       if (rows.length) {
         resp.status(200).send(intoHistory(rows));
       } else {
-        resp.status(404).send();
+        resp.status(200).send({
+          total: 0,
+          rewards: [],
+        } as RewardsHistory);
       }
     },
   });

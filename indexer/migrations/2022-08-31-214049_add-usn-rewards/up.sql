@@ -1,3 +1,20 @@
+-- NOTE
+-- Previously, the way this worked was:
+--   As soon as an order was filled, the rebate amount was multiplied by some
+--   parameters and the result was the reward amount. This meant you'd know
+--   in ~real time how much you'd earned, but
+--     1. if volumes were low, you'd pay out nothing
+--     2. the reward-per day was uncapped
+--
+-- Now, the way it works is:
+--   Decide a fixed rewards pool for the day. You do the same calculation on
+--   rebates, but treat the result as "points". At the end of the day, each
+--   user is paid a share of the pool in proportion to their points earned.
+--     1. you now only know the share that you've earned today, which is
+--        unfinalized until the day ends
+--     2. payouts are capped, math is easier, updates are easier, etc
+--
+-- However the "points" column is still called "rewards"
 begin
 ;
 
@@ -36,7 +53,8 @@ create table rewards.params as (
         -- <= this many bps from 1.000 is eligible
         4 :: numeric eligible_bp_distance,
         -- the lower this is, the more we reward length of time on orderbook
-        4 :: numeric time_divisor
+        4 :: numeric time_divisor,
+        0 :: numeric rewards_pool
 );
 
 create view rewards.usn_reward_multipliers as (
@@ -87,7 +105,7 @@ create view rewards.usn_rewards_calculator as (
                 price_multiplier * time_multiplier * side_multiplier :: numeric * rebate_base_amount
             ),
             4
-        ) reward,
+        ) points,
         date(filled_at) as reward_date
     from
         rewards.usn_reward_multipliers
@@ -96,12 +114,19 @@ create view rewards.usn_rewards_calculator as (
         reward_date
 );
 
-create table rewards.payouts (
+create table rewards.parameters_audit (
     max_price_multiplier numeric,
     eligible_bp_distance numeric,
     time_divisor numeric,
+    -- in terms of whole number dollars, not decimal-aware
+    rewards_pool numeric,
+    reward_date date
+);
+
+create table rewards.payouts (
     account_id text,
-    reward numeric,
+    points numeric,
+    payout numeric,
     reward_date date,
     -- if set, means paid. if not, means pending payment
     paid_in_tx_id text default null,
