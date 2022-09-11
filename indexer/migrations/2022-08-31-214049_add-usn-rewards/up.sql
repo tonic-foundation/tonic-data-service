@@ -14,15 +14,17 @@
 --        unfinalized until the day ends
 --     2. payouts are capped, math is easier, updates are easier, etc
 --
--- However the "points" column is still called "rewards"
---
 -- More in detail, the way to operate a rewards program is
 --   1. Set parameters (start date, eligible spread bps, multipliers, etc)
+--      - yarn ts-node scripts/rewards/init-program.ts
 --   2. At the start of day,
---      i.   Set the day's rewards pool
---      ii.  Compute the previous day's payouts in app code and save
---      iii. Save previous day's parameters in the audit table
---      iv.  Optional: update multipliers
+--      i.   Set the day's rewards pool (yarn ts-node scrips/rewards/set-params.ts)
+--      ii.  Compute the previous day's payouts in app code and save (yarn ts-node scrips/rewards/update-payouts.ts)
+--           - This script runs in a transaction and the payouts table has a
+--             unique index to prevent duplicate payouts per day, so it's safe
+--             to re-run this if it fails for some reason.
+--      iii. Save previous day's parameters in the audit table (happens automatically in the update-payouts script)
+--      iv.  Optional: update multipliers (see i.)
 begin
 ;
 
@@ -30,7 +32,9 @@ create schema rewards;
 
 grant usage on schema rewards to readonly;
 
-alter default privileges in schema rewards grant select on tables to readonly;
+alter default privileges in schema rewards grant
+select
+    on tables to readonly;
 
 -- return 1 if val is 0, else val. could've been min/max whatever
 create
@@ -51,25 +55,33 @@ create table rewards.const as (
             where
                 symbol = 'usn/usdc'
         ) usn_usdc_market_id,
-        date('2022-08-29 16:00:00' :: timestamp) start_date,
-        date('2022-10-01 16:00:00' :: timestamp) end_date
+        date('1970-01-01') start_date,
+        date('1970-01-01') end_date
 );
 
 -- parameters for computing points, total prize pool, etc
-create table rewards.params as (
-    select
-        -- multiplier when quoted price is exactly 1.000
-        -- 
-        5 :: numeric max_price_multiplier,
-        -- <= this many bps from 1.000 is eligible
-        4 :: numeric eligible_bp_distance,
-        -- the lower this is, the more we reward length of time on orderbook
-        4 :: numeric time_divisor,
-        0 :: numeric rewards_pool
+create table rewards.params (
+    id serial primary key,
+    reward_date date,
+    max_price_multiplier numeric default 5,
+    -- <= this many bps from 1.000 is eligible
+    eligible_bp_distance numeric default 4,
+    -- the lower this is, the more we reward length of time on orderbook
+    time_divisor numeric default 4,
+    rewards_pool numeric default 0
 );
 
+create unique index params_date on rewards.params(reward_date);
+
 create view rewards.point_multipliers as (
-    with multiplier_params as (
+    with fills_by_date as (
+        select
+            *,
+            date(created_at) reward_date
+        from
+            fill_event
+    ),
+    multiplier_params as (
         select
             f.maker_account_id,
             abs((f.fill_price :: numeric - const.one_usdc) / 100) as bp_distance,
@@ -93,23 +105,28 @@ create view rewards.point_multipliers as (
             -- (is_bid == true) -> 1 + 1
             (not f.is_bid) :: int + 1 as side_multiplier,
             fill_qty :: numeric / const.one_usn as points_base,
-            f.created_at as filled_at
+            f.reward_date
         from
-            fill_event f
+            fills_by_date f
             inner join order_event o on f.maker_order_id = o.order_id
             cross join rewards.const const
-            cross join rewards.params params
+            join rewards.params params on params.reward_date = f.reward_date
         where
             f.market_id = const.usn_usdc_market_id
     )
     select
-        *,
+        maker_account_id,
+        bp_distance,
+        time_multiplier,
+        side_multiplier,
+        points_base,
+        mp.reward_date,
         -- the closer your were to midmarket, the more points you get
         params.max_price_multiplier / rewards.bumper(bp_distance) as price_multiplier
     from
-        multiplier_params
+        multiplier_params mp
         cross join rewards.const const
-        cross join rewards.params params
+        join rewards.params params on params.reward_date = mp.reward_date
     where
         bp_distance <= params.eligible_bp_distance
 );
@@ -123,23 +140,12 @@ create view rewards.usn_rewards_calculator as (
             ),
             4
         ) points,
-        date(filled_at) as reward_date
+        reward_date
     from
         rewards.point_multipliers
     group by
         account_id,
         reward_date
-);
-
--- supposed to hold the parameters from yesterday, idk.
--- might want a trigger for this? but idc
-create table rewards.parameters_audit (
-    max_price_multiplier numeric,
-    eligible_bp_distance numeric,
-    time_divisor numeric,
-    -- in terms of whole number dollars, not decimal-aware
-    rewards_pool numeric,
-    reward_date date
 );
 
 create table rewards.payouts (
@@ -149,7 +155,7 @@ create table rewards.payouts (
     reward_date date,
     -- if set, means paid. if not, means pending payment
     paid_in_tx_id text default null,
-    unique (account_id, reward_date)
+    unique(account_id, reward_date)
 );
 
 commit;
