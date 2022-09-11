@@ -16,68 +16,27 @@ const knex = getConnection(getDbConnectConfig());
 
 export interface CliOptions {
   'dry-run'?: boolean;
-  rewards_pool: number;
-  time_divisor?: number;
-  max_price_multiplier?: number;
-  eligible_bp_distance?: number;
+  todo: string;
 }
 
 export const args = parse<CliOptions>({
   'dry-run': { type: Boolean, optional: true },
-  rewards_pool: { type: Number },
-  eligible_bp_distance: {
-    type: Number,
-    optional: true,
-  },
-  max_price_multiplier: {
-    type: Number,
-    optional: true,
-  },
-  time_divisor: {
-    type: Number,
-    optional: true,
-  },
+  todo: { type: String },
 });
 
-interface RewardsParams {
-  rewards_pool: number;
-  time_divisor: number;
-  max_price_multiplier: number;
-  eligible_bp_distance: number;
+interface PayoutsParams {
+  todo: string;
 }
 
-async function getExistingParameters(): Promise<RewardsParams> {
-  return await knex<RewardsParams>('rewards.params').first('*');
-}
-
-async function updateParameters(opts: RewardsParams) {
-  return await knex
-    .raw(
-      `
-        update rewards.params
-        set
-          rewards_pool = :rewards_pool,
-          time_divisor = :time_divisor,
-          max_price_multiplier = :max_price_multiplier,
-          eligible_bp_distance = :eligible_bp_distance
-        where true;
-      `,
-      opts as unknown as Record<string, string>
-    )
-    .catch((err: unknown) => {
-      console.error(`oh nooo`, err);
-      throw err;
-    });
+async function updateParameters(params: PayoutsParams) {
+  console.log(params);
 }
 
 async function run() {
-  const existing = await getExistingParameters();
-
   const _optsFromArgs = { ...args };
   delete _optsFromArgs['dry-run'];
 
-  const opts: RewardsParams = {
-    ...existing,
+  const opts: PayoutsParams = {
     ..._optsFromArgs,
   };
 
