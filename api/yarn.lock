@@ -252,9 +252,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tonic-foundation/data-api@workspace:packages/api":
+"@tonic-foundation/data-api@workspace:packages/server":
   version: 0.0.0-use.local
-  resolution: "@tonic-foundation/data-api@workspace:packages/api"
+  resolution: "@tonic-foundation/data-api@workspace:packages/server"
   dependencies:
     "@fastify/cors": ^7.0.0
     "@sentry/node": ^6.19.7
