@@ -31,7 +31,7 @@ order by reward_date asc;
 
 export interface RewardEntry {
   total: number;
-  reward: number;
+  payout: number;
   reward_date: Date;
   paid_in_tx_id: string | null;
 }
@@ -53,7 +53,7 @@ function intoHistory(entries: RewardEntry[]): RewardsHistory {
     total: entries[0].total,
     rewards: entries.map((e) => {
       return {
-        reward: e.reward,
+        payout: e.payout,
         reward_date: e.reward_date,
         paid_in_tx_id: e.paid_in_tx_id,
       };
