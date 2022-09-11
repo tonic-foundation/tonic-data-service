@@ -73,6 +73,19 @@ create table rewards.params (
 
 create unique index params_date on rewards.params(reward_date);
 
+-- if you're not in this table, your points go to 0
+create table rewards.signups (account_id text not null);
+
+create view rewards.eligible_accounts as (
+    select
+        s.account_id
+    from
+        rewards.signups s
+        join nft.nft_holder h on s.account_id = h.account_id
+    where
+        h.n_held > 0
+);
+
 create view rewards.point_multipliers as (
     with fills_by_date as (
         select
@@ -84,6 +97,15 @@ create view rewards.point_multipliers as (
     multiplier_params as (
         select
             f.maker_account_id,
+            (
+                exists (
+                    select
+                    from
+                        rewards.eligible_accounts ea
+                    where
+                        ea.account_id = f.maker_account_id
+                )
+            ) :: int eligibility_multiplier,
             abs((f.fill_price :: numeric - const.one_usdc) / 100) as bp_distance,
             greatest(
                 1,
@@ -116,6 +138,7 @@ create view rewards.point_multipliers as (
     )
     select
         maker_account_id,
+        eligibility_multiplier,
         bp_distance,
         time_multiplier,
         side_multiplier,
@@ -136,7 +159,7 @@ create view rewards.usn_rewards_calculator as (
         maker_account_id account_id,
         trunc(
             sum(
-                price_multiplier * time_multiplier * side_multiplier :: numeric * points_base
+                eligibility_multiplier * price_multiplier * time_multiplier * side_multiplier :: numeric * points_base
             ),
             4
         ) points,
