@@ -15,6 +15,14 @@
 --     2. payouts are capped, math is easier, updates are easier, etc
 --
 -- However the "points" column is still called "rewards"
+--
+-- More in detail, the way to operate a rewards program is
+--   1. Set parameters (start date, eligible spread bps, multipliers, etc)
+--   2. At the start of day,
+--      i.   Set the day's rewards pool
+--      ii.  Compute the previous day's payouts in app code and save
+--      iii. Save previous day's parameters in the audit table
+--      iv.  Optional: update multipliers
 begin
 ;
 
@@ -43,12 +51,15 @@ create table rewards.const as (
             where
                 symbol = 'usn/usdc'
         ) usn_usdc_market_id,
-        date('2022-08-29 16:00:00' :: timestamp) start_date
+        date('2022-08-29 16:00:00' :: timestamp) start_date,
+        date('2022-10-01 16:00:00' :: timestamp) end_date
 );
 
+-- parameters for computing points, total prize pool, etc
 create table rewards.params as (
     select
         -- multiplier when quoted price is exactly 1.000
+        -- 
         5 :: numeric max_price_multiplier,
         -- <= this many bps from 1.000 is eligible
         4 :: numeric eligible_bp_distance,
@@ -57,14 +68,17 @@ create table rewards.params as (
         0 :: numeric rewards_pool
 );
 
-create view rewards.usn_reward_multipliers as (
+create view rewards.point_multipliers as (
     with multiplier_params as (
         select
             f.maker_account_id,
             abs((f.fill_price :: numeric - const.one_usdc) / 100) as bp_distance,
             greatest(
                 1,
-                -- hours since order created (up to 24 max)
+                -- Time-based points boost. The longer the order was on the
+                -- book, the larger the boost, up to 24h.
+                --
+                -- Starts at 1, caps at 24 / params.time_divisor
                 least(
                     24,
                     extract(
@@ -74,9 +88,11 @@ create view rewards.usn_reward_multipliers as (
                     ) / 3600
                 ) :: numeric / params.time_divisor
             ) as time_multiplier,
-            -- maker buys help maintain the peg so they get a boost
+            -- Resting bids help maintain the peg so they get a 2x boost.
+            -- (is_bid == false) -> 0 + 1
+            -- (is_bid == true) -> 1 + 1
             (not f.is_bid) :: int + 1 as side_multiplier,
-            maker_rebate :: numeric / const.one_usdc as rebate_base_amount,
+            fill_qty :: numeric / const.one_usn as points_base,
             f.created_at as filled_at
         from
             fill_event f
@@ -88,6 +104,7 @@ create view rewards.usn_reward_multipliers as (
     )
     select
         *,
+        -- the closer your were to midmarket, the more points you get
         params.max_price_multiplier / rewards.bumper(bp_distance) as price_multiplier
     from
         multiplier_params
@@ -102,18 +119,20 @@ create view rewards.usn_rewards_calculator as (
         maker_account_id account_id,
         trunc(
             sum(
-                price_multiplier * time_multiplier * side_multiplier :: numeric * rebate_base_amount
+                price_multiplier * time_multiplier * side_multiplier :: numeric * points_base
             ),
             4
         ) points,
         date(filled_at) as reward_date
     from
-        rewards.usn_reward_multipliers
+        rewards.point_multipliers
     group by
         account_id,
         reward_date
 );
 
+-- supposed to hold the parameters from yesterday, idk.
+-- might want a trigger for this? but idc
 create table rewards.parameters_audit (
     max_price_multiplier numeric,
     eligible_bp_distance numeric,

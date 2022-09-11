@@ -68,7 +68,7 @@ CREATE VIEW competition.quote_volume_1d_with_goblin AS (
         (unwrap_or(nft.multiplier, 1) * v1d.v) vol_after_goblin
     FROM
         competition.quote_volume_1d v1d
-        LEFT JOIN competition.nft_holder nft ON nft.account_id = v1d.account_id
+        LEFT JOIN nft.nft_holder nft ON nft.account_id = v1d.account_id
     WHERE
         v1d.account_id NOT IN (
             SELECT
@@ -138,7 +138,7 @@ CREATE VIEW competition.quote_volume_5s_with_goblin AS (
         (unwrap_or(nft.multiplier, 1) * v5s.v) vol_with_goblin
     FROM
         competition.quote_volume_5s v5s
-        LEFT JOIN competition.nft_holder nft ON nft.account_id = v5s.account_id
+        LEFT JOIN nft.nft_holder nft ON nft.account_id = v5s.account_id
 );
 
 CREATE VIEW competition.first_to_10k AS WITH running_total_by_user AS (

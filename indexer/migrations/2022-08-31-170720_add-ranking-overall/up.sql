@@ -19,7 +19,7 @@ create view competition.quote_volume as (
         fill_event f
         join order_event o on f.maker_order_id = o.order_id
         or f.taker_order_id = o.order_id
-        left join competition.nft_holder nft on nft.account_id = f.maker_account_id
+        left join nft.nft_holder nft on nft.account_id = f.maker_account_id
         or nft.account_id = f.taker_account_id
         cross join competition.const
     where
@@ -90,7 +90,7 @@ create view competition.tpum as (
         ) after_multiplier
     from
         competition.tpm
-        left join competition.nft_holder nft on nft.account_id = competition.tpm.account_id
+        left join nft.nft_holder nft on nft.account_id = competition.tpm.account_id
 );
 
 -- Create rankings as materialized view. Clients can use the `race` column to
