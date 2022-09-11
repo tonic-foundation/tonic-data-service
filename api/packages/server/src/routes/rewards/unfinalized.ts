@@ -9,7 +9,7 @@ with total_unfinalized as (
     sum(points) total_unfinalized
   from
     rewards.usn_rewards_calculator
-  where reward_date = date(now() - interval '2 day')
+  where reward_date = date(now())
 ),
 all_unfinalized_rewards as (
   select
@@ -21,7 +21,7 @@ all_unfinalized_rewards as (
   cross join
     total_unfinalized tu
   where
-    reward_date = date(now() - interval '2 day')
+    reward_date = date(now())
 ),
 unfinalized_rankings as (
   select

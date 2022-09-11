@@ -1,5 +1,8 @@
 /**
- * Update number of goblins held for all participants in competition.
+ * Update number of goblins held by accounts that have placed orders on Tonic.
+ *
+ * This is far from optimal---ideally, we'd index this data ourselves. At the
+ * moment, this involves querying nearly 400 times.
  *
  * ; export POSTGRES_CONNECTION="postgres://..."
  * ; export NEAR_ENV=mainnet
@@ -10,7 +13,7 @@ import { Near } from 'near-api-js';
 import { parse } from 'ts-command-line-args';
 import { getNearConfig } from '@tonic-foundation/config';
 import { InMemoryKeyStore } from 'near-api-js/lib/key_stores';
-import { getDbConnectConfig } from '../src/config';
+import { getDbConnectConfig } from '../../src/config';
 import getConnection from 'knex';
 
 const knex = getConnection(getDbConnectConfig());
@@ -27,12 +30,12 @@ export const args = parse<CliOptions>({
 });
 
 async function getParticipants(): Promise<string[]> {
-  const rows = await knex('competition.ranking_overall').distinct('account_id');
+  const rows = await knex('order_event').distinct('account_id');
   return rows.map((row: { account_id: string }) => row.account_id);
 }
 
 async function updateGoblinsHeld(account_id: string, n_held: number, multiplier: number) {
-  return await knex('competition.nft_holder')
+  return await knex('nft.nft_holder')
     .insert({
       account_id,
       n_held,
@@ -71,6 +74,8 @@ async function run() {
   const account = await near.account('dontcare');
 
   const accounts = await getParticipants();
+  console.log(accounts.length, 'accounts to check');
+
   for (const id of accounts) {
     const res: unknown[] = await account.viewFunction(NFT_CONTRACT_ID, 'nft_tokens_for_owner', {
       account_id: id,
