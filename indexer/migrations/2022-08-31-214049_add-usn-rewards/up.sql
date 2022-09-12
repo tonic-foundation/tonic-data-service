@@ -74,7 +74,7 @@ create table rewards.params (
 create unique index params_date on rewards.params(reward_date);
 
 -- if you're not in this table, your points go to 0
-create table rewards.signup (account_id text not null);
+create table rewards.signup (account_id text not null, unique(account_id));
 
 create view rewards.eligible_account as (
     select
