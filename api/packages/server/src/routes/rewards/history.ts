@@ -17,6 +17,7 @@ with total_payments_per_account as (
 select
   -- join the total so we can get the summary in one query
   tppa.total,
+  points,
   payout,
   reward_date,
   paid_in_tx_id
@@ -31,6 +32,7 @@ order by reward_date asc;
 
 export interface RewardEntry {
   total: number;
+  points: number;
   payout: number;
   reward_date: Date;
   paid_in_tx_id: string | null;
@@ -38,9 +40,15 @@ export interface RewardEntry {
 
 export interface RewardsHistory {
   total: number;
-  rewards: Omit<RewardEntry, 'total'>[];
+  // RewardEntry but omit total and make the date a string
+  rewards: (Omit<RewardEntry, 'total' | 'reward_date'> & { reward_date: string })[];
 }
 
+/**
+ * Group history rows into a single object.
+ *
+ * Strip timezone information out of the date; it's not useful for this API.
+ */
 function intoHistory(entries: RewardEntry[]): RewardsHistory {
   if (!entries.length) {
     return {
@@ -54,7 +62,9 @@ function intoHistory(entries: RewardEntry[]): RewardsHistory {
     rewards: entries.map((e) => {
       return {
         payout: e.payout,
-        reward_date: e.reward_date,
+        // server is assumed to be in UTC
+        points: e.points,
+        reward_date: e.reward_date.toISOString().split('T')[0],
         paid_in_tx_id: e.paid_in_tx_id,
       };
     }),

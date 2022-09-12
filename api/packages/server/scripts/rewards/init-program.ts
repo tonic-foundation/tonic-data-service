@@ -7,6 +7,7 @@
 import { parse } from 'ts-command-line-args';
 import { getDbConnectConfig } from '../../src/config';
 import getConnection from 'knex';
+import { assertValidDate } from './util';
 
 const knex = getConnection(getDbConnectConfig());
 
@@ -65,17 +66,9 @@ async function setProgramConst(opts: RewardsConstOpts) {
   });
 }
 
-function validDate(s: string): boolean {
-  return !!s.match(/\d\d\d\d-\d\d-\d\d/)?.length;
-}
-
 async function run() {
-  if (!validDate(args['end-date'])) {
-    throw new Error('invalid end date, must match yyyy-mm-dd');
-  }
-  if (!validDate(args['start-date'])) {
-    throw new Error('invalid start date, must match yyyy-mm-dd');
-  }
+  assertValidDate(args['end-date']);
+  assertValidDate(args['start-date']);
 
   const opts: RewardsConstOpts = {
     start_date: args['start-date'],

@@ -7,6 +7,7 @@
 import { parse } from 'ts-command-line-args';
 import { getDbConnectConfig } from '../../src/config';
 import getConnection from 'knex';
+import { assertValidDate } from './util';
 
 const knex = getConnection(getDbConnectConfig());
 
@@ -70,15 +71,8 @@ async function updateParameters(opts: RewardsParams) {
     });
 }
 
-function validDate(s: string): boolean {
-  return !!s.match(/\d\d\d\d-\d\d-\d\d/)?.length;
-}
-
 async function run() {
-  if (!validDate(args['reward_date'])) {
-    console.error('invalid date');
-    process.exit(1);
-  }
+  assertValidDate(args['reward_date']);
 
   const row = await getExistingParameters(args['reward_date']);
 
