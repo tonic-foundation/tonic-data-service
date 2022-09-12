@@ -74,13 +74,13 @@ create table rewards.params (
 create unique index params_date on rewards.params(reward_date);
 
 -- if you're not in this table, your points go to 0
-create table rewards.signups (account_id text not null);
+create table rewards.signup (account_id text not null);
 
-create view rewards.eligible_accounts as (
+create view rewards.eligible_account as (
     select
         s.account_id
     from
-        rewards.signups s
+        rewards.signup s
         join nft.nft_holder h on s.account_id = h.account_id
     where
         h.n_held > 0
@@ -101,7 +101,7 @@ create view rewards.point_multipliers as (
                 exists (
                     select
                     from
-                        rewards.eligible_accounts ea
+                        rewards.eligible_account ea
                     where
                         ea.account_id = f.maker_account_id
                 )

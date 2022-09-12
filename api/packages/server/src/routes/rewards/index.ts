@@ -1,5 +1,6 @@
 // Routes for USN rewards program.
 import { FastifyInstance } from 'fastify';
+import eligibility from './eligibility';
 
 import history from './history';
 import parameters from './parameters';
@@ -11,6 +12,7 @@ export default function registerRewardsRoutes(api: FastifyInstance, _: unknown, 
   api.register(history);
   api.register(stats);
   api.register(parameters);
+  api.register(eligibility);
 
   done();
 }
