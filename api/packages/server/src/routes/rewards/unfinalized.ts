@@ -1,6 +1,5 @@
 // Unfinalized rewards for the current UTC day, computed using the view and
-// cached for ~15 minutes per user.
-// TODO XXX FIXME: remove the interval '1 day' stuff, it's just for testing
+// cached per user.
 import { FastifyInstance } from 'fastify';
 
 const REWARDS_TODAY_QUERY = `

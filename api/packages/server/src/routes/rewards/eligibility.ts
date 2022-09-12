@@ -1,10 +1,6 @@
-// Summary of an account's payouts (pending, paid, and total)
+// is the account eligible to earn rewards
 import { FastifyInstance } from 'fastify';
 
-/**
- * If the account earned no rewards on a given day, the row for that day will
- * simply be missing. Missing days are filled in on the frontend.
- */
 const ELIGIBILITY_QUERY = `
   select (
     exists (
@@ -36,7 +32,6 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
         account: { type: 'string' },
       },
     },
-    // TODO: search? or maybe return params with history?
     handler: async (req, resp) => {
       const { account } = req.query;
       if (!account?.length) {

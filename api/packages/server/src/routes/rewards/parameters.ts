@@ -1,10 +1,6 @@
-// Summary of an account's payouts (pending, paid, and total)
+// parameters for the day
 import { FastifyInstance } from 'fastify';
 
-/**
- * If the account earned no rewards on a given day, the row for that day will
- * simply be missing. Missing days are filled in on the frontend.
- */
 const PARAMETERS_QUERY = `
   select
     start_date,
