@@ -30,7 +30,7 @@ export const args = parse<CliOptions>({
 });
 
 async function getParticipants(): Promise<string[]> {
-  const rows = await knex('order_event').distinct('account_id');
+  const rows = await knex('rewards.signup').distinct('account_id');
   return rows.map((row: { account_id: string }) => row.account_id);
 }
 
