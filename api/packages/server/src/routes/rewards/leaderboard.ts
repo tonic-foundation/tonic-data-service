@@ -1,47 +1,50 @@
 // parameters for the day
 import { FastifyInstance } from 'fastify';
 
-const PAYOUT_QUERY = `
+const LEADERBOARD_QUERY_WITH_DATE = `
+with rewards_total as (
+    select
+        sum(points :: numeric) total
+    from
+        rewards.usn_rewards_calculator
+),
+shares as (
+    select
+        account_id,
+        points,
+        points / t.total share,
+        reward_date
+    from
+        rewards.usn_rewards_calculator c
+        cross join rewards_total t
+)
 select
+    dense_rank() over (order by points desc, account_id) ranking,
     account_id,
-    payout,
-    reward_date
+    points,
+    trunc(share * p.rewards_pool, 2) payout,
+    shares.reward_date
 from
-    rewards.payouts
-    and payout > 0
-order by
-    reward_date,
-    payout desc,
-    account_id;
-`;
-
-const PAYOUT_QUERY_WITH_DATE = `
-select
-    account_id,
-    payout,
-    reward_date
-from
-    rewards.payouts
+    shares
+    join rewards.params p on p.reward_date = shares.reward_date
 where
-    reward_date = :reward_date
-    and payout > 0
-order by
-    reward_date,
-    payout desc,
-    account_id;
+    shares.reward_date = :reward_date;
 `;
 
-export interface Payout {
+export interface Ranking {
+  ranking: string;
   account_id: string;
   payout: string;
   reward_date: Date;
 }
 
-function formatOutput(payouts: Payout[], format: 'csv' | 'json'): string | Payout[] {
+function formatOutput(payouts: Ranking[], format: 'csv' | 'json'): string | Ranking[] {
   if (format === 'json') {
     return payouts;
   }
-  return payouts.map((p) => [p.account_id, p.payout, p.reward_date.toISOString().split('T')[0]].join(',')).join('\n');
+  return payouts
+    .map((p) => [p.ranking, p.account_id, p.payout, p.reward_date.toISOString().split('T')[0]].join(','))
+    .join('\n');
 }
 
 export default function (server: FastifyInstance, _: unknown, done: () => unknown) {
@@ -60,18 +63,25 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
         format: { type: 'string' },
       },
     },
-    // TODO: search? or maybe return params with history?
     handler: async (req, resp) => {
       const { date, format = 'json' } = req.query;
       const { knex } = server;
 
-      if (date) {
-        const { rows } = await knex.raw<{ rows: Payout[] }>(PAYOUT_QUERY_WITH_DATE, { reward_date: date });
-        resp.status(200).send(formatOutput(rows, format));
-      } else {
-        const { rows } = await knex.raw<{ rows: Payout[] }>(PAYOUT_QUERY);
-        resp.status(200).send(formatOutput(rows, format));
+      if (!date) {
+        resp.status(400).send({ msg: 'missing date' });
+        return;
       }
+
+      const data = await server.withCache({
+        key: `rewards-leaderboard-${date}-${format}`,
+        ttl: 5 * 60_000,
+        async get() {
+          const { rows } = await knex.raw<{ rows: Ranking[] }>(LEADERBOARD_QUERY_WITH_DATE, { reward_date: date });
+          return formatOutput(rows, format);
+        },
+      });
+
+      resp.status(200).send(data);
     },
   });
 

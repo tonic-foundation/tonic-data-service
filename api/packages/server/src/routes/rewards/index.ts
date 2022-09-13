@@ -3,18 +3,20 @@ import { FastifyInstance } from 'fastify';
 import eligibility from './eligibility';
 
 import history from './history';
-import leaderboard from './leaderboard';
+import payouts from './payouts';
 import parameters from './parameters';
 import stats from './stats';
 import unfinalized from './unfinalized';
+import leaderboard from './leaderboard';
 
 export default function registerRewardsRoutes(api: FastifyInstance, _: unknown, done: () => unknown) {
-  api.register(unfinalized);
-  api.register(history);
-  api.register(stats);
-  api.register(parameters);
   api.register(eligibility);
+  api.register(history);
   api.register(leaderboard);
+  api.register(parameters);
+  api.register(payouts);
+  api.register(stats);
+  api.register(unfinalized);
 
   done();
 }
