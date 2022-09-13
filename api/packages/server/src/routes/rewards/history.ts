@@ -15,7 +15,6 @@ with total_payments_per_account as (
   group by account_id
 )
 select
-  -- join the total so we can get the summary in one query
   tppa.total,
   points,
   payout,

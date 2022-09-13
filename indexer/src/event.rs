@@ -3,6 +3,7 @@
 use tonic_sdk::events::Event as DexEvent;
 
 // const EVENT_PREFIX: &'static str = "EVENT_JSON:";
+// All Tonic logs are events.
 const EVENT_PREFIX: &'static str = "";
 const PREFIX_LENGTH: usize = EVENT_PREFIX.len();
 

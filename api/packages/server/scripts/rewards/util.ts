@@ -4,7 +4,7 @@ import readline from 'readline';
  * validate postgres date (pg does this but seems flexible so best to do it here)
  */
 export function assertValidDate(s: string, exit = true): boolean {
-  if (!!s.match(/\d\d\d\d-\d\d-\d\d/)?.length) {
+  if (!s.match(/\d\d\d\d-\d\d-\d\d/)?.length) {
     console.error('Invalid date, must be YYYY-MM-DD');
     if (exit) {
       process.exit(1);

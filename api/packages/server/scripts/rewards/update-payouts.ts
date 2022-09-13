@@ -110,19 +110,14 @@ async function run() {
     ..._optsFromArgs,
   };
 
-  const _payouts = await getPayouts(opts);
-  const payouts = (() => {
-    const mine = _payouts.find((p) => p.account_id === 'renthog.near');
-    if (mine) {
-      return [mine];
-    }
-    return [];
-  })();
-
+  const payouts = await getPayouts(opts);
+  const total = payouts.reduce((acc, cur) => acc + parseFloat(cur.payout), 1);
   if (args['dry-run']) {
     console.table(payouts);
+    console.log(`TOTAL: ${total}`);
   } else {
     console.table(payouts);
+    console.log(`TOTAL: ${total}`);
     await prompt('Press [ENTER] to save');
 
     console.log('saving');
