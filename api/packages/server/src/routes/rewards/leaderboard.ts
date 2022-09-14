@@ -1,34 +1,39 @@
-// parameters for the day
+// live leaderboard using the points calculator view
 import { FastifyInstance } from 'fastify';
 
 const LEADERBOARD_QUERY_WITH_DATE = `
 with rewards_total as (
-    select
-        sum(points :: numeric) total
-    from
-        rewards.usn_rewards_calculator
+  select
+      sum(points :: numeric) total,
+      reward_date
+  from
+      rewards.usn_rewards_calculator
+  group by reward_date
 ),
 shares as (
-    select
-        account_id,
-        points,
-        points / t.total share,
-        reward_date
-    from
-        rewards.usn_rewards_calculator c
-        cross join rewards_total t
+  select
+      c.account_id,
+      c.points,
+      points / t.total share,
+      t.reward_date
+  from
+      rewards.usn_rewards_calculator c
+      join rewards_total t on t.reward_date = c.reward_date
 )
 select
-    dense_rank() over (order by points desc, account_id) ranking,
-    account_id,
-    points,
-    trunc(share * p.rewards_pool, 2) payout,
-    shares.reward_date
+  dense_rank() over (order by points desc, account_id) ranking,
+  account_id,
+  points,
+  share,
+  trunc(share * p.rewards_pool, 2) payout,
+  shares.reward_date
 from
-    shares
-    join rewards.params p on p.reward_date = shares.reward_date
+  shares
+  join rewards.params p on p.reward_date = shares.reward_date
 where
-    shares.reward_date = :reward_date;
+  points > 0
+  and shares.reward_date = :reward_date
+order by ranking, account_id;
 `;
 
 export interface Ranking {

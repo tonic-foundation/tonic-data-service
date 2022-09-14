@@ -1,4 +1,7 @@
-// parameters for the day
+// for historical payouts (fetches from the hard table)
+// nb: because of a fix in the way points are calculated, day 1
+// in the september program is a few cents off the live query
+// used in /leaderboard
 import { FastifyInstance } from 'fastify';
 
 const PAYOUT_QUERY = `
