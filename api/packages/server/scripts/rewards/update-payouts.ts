@@ -16,11 +16,13 @@ const knex = getConnection(getDbConnectConfig());
 
 export interface CliOptions {
   'dry-run'?: boolean;
+  paid_in_tx_id?: string;
   reward_date: string;
 }
 
 export const args = parse<CliOptions>({
   'dry-run': { type: Boolean, optional: true },
+  paid_in_tx_id: { type: String, optional: true },
   reward_date: { type: String },
 });
 
@@ -29,37 +31,17 @@ interface PayoutsParams {
 }
 
 const PAYOUTS_QUERY = `
-with rewards_total as (
-    select
-        sum(points :: numeric) total,
-        reward_date
-    from
-        rewards.usn_rewards_calculator
-    group by reward_date
-),
-shares as (
-    select
-        c.account_id,
-        c.points,
-        points / t.total share,
-        t.reward_date
-    from
-        rewards.usn_rewards_calculator c
-        join rewards_total t on t.reward_date = c.reward_date
-)
 select
-    account_id,
-    points,
-    share,
-    trunc(share * p.rewards_pool, 2) payout,
-    shares.reward_date
-from
-    shares
-    join rewards.params p on p.reward_date = shares.reward_date
+  account_id,
+  points,
+  share,
+  payout,
+  reward_date
+from rewards.usn_payouts_leaderboard
 where
-    points > 0
-    and shares.reward_date = :reward_date
-order by payout desc, account_id;
+  reward_date = :reward_date
+  and points > 0
+order by ranking, account_id;
 `;
 
 interface Payout {
@@ -68,6 +50,7 @@ interface Payout {
   share: string;
   payout: string;
   reward_date: Date;
+  paid_in_tx_id: string;
 }
 async function getPayouts(params: PayoutsParams) {
   const { rows: payouts } = await knex.raw<{ rows: Payout[] }>(
@@ -87,13 +70,15 @@ async function savePayouts(payouts: Payout[]) {
             account_id,
             points,
             payout,
-            reward_date
+            reward_date,
+            paid_in_tx_id
           )
           values (
             :account_id,
             :points,
             :payout,
-            :reward_date
+            :reward_date,
+            :paid_in_tx_id
           );
           `,
           payout as unknown as Record<string, string>
@@ -107,6 +92,11 @@ async function savePayouts(payouts: Payout[]) {
 }
 
 async function run() {
+  if (!args['dry-run'] && !args['paid_in_tx_id']) {
+    console.error('paid_in_tx_id must be provided when writing payouts');
+    process.exit(1);
+  }
+
   const _optsFromArgs = { ...args };
   delete _optsFromArgs['dry-run'];
 
