@@ -7,6 +7,7 @@ table! {
         order_id -> Text,
         refund_amount -> Text,
         refund_token -> Text,
+        cancelled_qty -> Nullable<Text>,
     }
 }
 

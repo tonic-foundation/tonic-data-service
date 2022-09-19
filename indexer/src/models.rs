@@ -33,6 +33,7 @@ pub struct NewCancelEvent {
     order_id: String,
     refund_amount: String,
     refund_token: String,
+    cancelled_qty: String,
     created_at: NaiveDateTime,
 }
 
@@ -51,6 +52,7 @@ pub fn save_new_cancel_event<'a>(
             order_id: base58_encode(&c.order_id.into()),
             refund_amount: c.refund_amount.0.to_string(),
             refund_token: c.refund_token.key(),
+            cancelled_qty: c.cancelled_qty.0.to_string(),
             created_at,
         })
         .collect();
