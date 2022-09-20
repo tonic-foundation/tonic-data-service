@@ -1,3 +1,8 @@
+-- v2: Points are usn amount * hours on the book * some multipliers determined
+-- by the price, side, etc.
+--
+-- This is actually almost the same as v1, but includes the concept of rollover
+-- points for portion of order still open at the end of the day
 begin
 ;
 
@@ -27,33 +32,39 @@ add
 -- the live leaderboard can't account for rollover points until the day ends,
 -- which could cause a jump in points. Applying it to the next day makes the
 -- payouts more predictable for the user.
-create table rewards.rollover_points (
+create table rewards.rollover_orders (
     account_id text,
+    order_id text,
+    open_quantity text,
+    hours_on_book numeric,
     points numeric,
     from_date date
 );
 
-create unique index rollover_points__account_id_from_date on rewards.rollover_points(account_id, from_date);
+create unique index rollover_points__account_id_from_date on rewards.rollover_orders(account_id, order_id, from_date);
 
--- We're doing this in the simplest way possible:
+create view rewards.rollover_points as (
+    select
+        account_id,
+        from_date,
+        sum(points) points
+    from
+        rewards.rollover_orders
+    group by
+        account_id,
+        from_date
+);
+
+-- note: this only includes fills *when you're the maker*
+-- so it's not generally usable as an "order reduction events" table
 --
--- Points are dollars of liquidity * hours on the book * some multipliers
--- determined by the price, side, etc.
+-- roughly, the way we compute points is: every time an order decreases for
+-- eligible causes (cancel, filled by a taker), we compute:
 --
--- (dollars of liquidity = amount of USN volume, not dependent on price)
+--   liquidity hours = decrement amount * hours on book 
 --
--- 1: Liquidity hours is something like the integral of this graph
---
---  ^ open quantity
---  |
---  |----+ fill
---  |    |
---  |    +----+ fill
---  |         |
---  |         +------+ order cancelled
---  |________________|_______________________ time ->
---
-create view rewards.order_reduction_events as (
+-- apply some multipliers and that's the points
+create view rewards.points_v2_inputs as (
     with limit_order_events as (
         -- table with one row for each event: created, filled, cancelled
         -- along with the decrease in size 
@@ -108,7 +119,8 @@ create view rewards.order_reduction_events as (
     ) -- Liquidity from previous day is counted in rollover_points. Thus, hours
     -- between events maxes out at 24h to avoid double count
     select
-        *,
+        o. *,
+        date(event_ts) event_date,
         least(
             extract(
                 epoch
@@ -116,42 +128,81 @@ create view rewards.order_reduction_events as (
                     (event_ts - order_created_at) / 3600
             ),
             24
-        ) as hours_between
+        ) as hours_on_book
     from
-        limit_order_events
+        limit_order_events o
+        cross join rewards.const const
+    where
+        -- this speeds things up tremendously. reason: everything is done with
+        -- partitions on event_date, but we only have index for timestamp, so
+        -- we have to do full scan. this constraint lets us use the timestamp
+        -- index first to reduce the amount we have to scan
+        event_ts > const.start_date
 );
 
-create function rewards.calculate_points_v2(
+create view rewards.usn_liquidity_hours as (
+    select
+        o. *,
+        -- total for this order in this market
+        sum(
+            decrement_amount :: numeric / const.one_usn * hours_on_book
+        ) over (partition by market_id, order_id) total_usn_hours
+    from
+        rewards.points_v2_inputs o
+        cross join rewards.const const
+    where
+        market_id = const.usn_usdc_market_id
+);
+
+create function rewards.calculate_points_v2 (
     limit_price numeric,
     amount numeric,
     hours_on_book numeric,
     side text,
     event_type text,
-    params_date date
-) returns numeric as $$ with multipliers as (
+    eligible_bp_distance numeric,
+    max_price_multiplier numeric,
+    fill_multiplier numeric
+) returns numeric as $$ with distance as (
+    -- bps from mid-market
     select
-        params.max_price_multiplier / rewards.bumper(
-            abs(
-                (limit_price - const.one_usdc) / 100
-            )
-        ) price_multiplier,
-        -- buys help maintain the peg so they get 2x boost
+        abs(
+            (limit_price - const.one_usdc) / 100
+        ) bp_distance
+    from
+        rewards.const const
+),
+multipliers as (
+    select
         case
-            when side = 'sell' then 1
-            else 2
+            when bp_distance > eligible_bp_distance then 0
+            else max_price_multiplier / rewards.bumper(bp_distance)
+        end price_multiplier,
+        -- usn bids help maintain the peg so they get 2x boost
+        case
+            when side = 'buy' then 2
+            else 1
         end side_multiplier,
+        -- fills get slight boost
         case
-            when event_type = 'filled' then coalesce(params.fill_multiplier, 1)
+            when event_type = 'filled' then coalesce(fill_multiplier, 1)
             else 1
         end fill_multiplier
     from
-        rewards.params
+        distance
         cross join rewards.const const
-    where
-        reward_date = params_date
 )
 select
-    hours_on_book * amount * price_multiplier * side_multiplier * fill_multiplier points
+    -- dollar hours x multipliers
+    -- divide by 1 usn
+    -- divide by 100 because the points add up too quickly without...
+    --
+    -- for scale, about 10 dollar bid liquidity at 1.0000 for the day would be
+    -- 10 * 24 * 5 * 2 * 1 = 2400 (points seem meaningless) scaled down it would
+    -- be 24
+    --
+    -- for some reason, a cross join on rewards here slows things to a crawl, so one_usn is hard coded...
+    amount * hours_on_book * price_multiplier * side_multiplier * fill_multiplier / 1000000000000000000 / 100 points
 from
     multipliers;
 
@@ -159,36 +210,22 @@ $$ language sql;
 
 -- this gets new points earned today. does not account for rollover points
 create view rewards.usn_rewards_calculator_v2 as (
-    with dollar_hours_per_day as (
-        -- gives dollar_hours *up to 24h previous*
+    with multipliers as (
         select
             *,
-            date(event_ts) event_date,
-            decrement_amount :: numeric * hours_between / const.one_usn dollar_hours
-        from
-            rewards.order_reduction_events
-            cross join rewards.const const
-    ),
-    multipliers as (
-        select
-            d. *,
             (
                 -- 1 if eligible, 0 if not
                 exists (
                     select
                     from
-                        rewards.eligible_account ea
+                        rewards.eligible_account e
                     where
-                        ea.account_id = d.account_id
+                        e.account_id = o.account_id
                 )
-            ) :: int eligibility_multiplier
+            ) eligible
         from
-            dollar_hours_per_day d
+            rewards.points_v2_inputs o
     ),
-    -- At this point, we _could_ calculate remaining open quantities in sql to
-    -- compute rollover points, but since points depend on price as well, the query
-    -- becomes complicated. Instead, rollover points are computed in a scheduled job
-    -- based on RPC and saved in another table, rewards.rollover_points.
     points_calculator as (
         select
             market_id,
@@ -200,14 +237,19 @@ create view rewards.usn_rewards_calculator_v2 as (
                 rewards.calculate_points_v2(
                     limit_price :: numeric,
                     decrement_amount :: numeric,
-                    hours_between,
+                    hours_on_book,
                     original_side,
                     event_type,
-                    event_date
+                    p.eligible_bp_distance,
+                    p.max_price_multiplier,
+                    p.fill_multiplier
                 ) -- dollar_hours * m.eligibility_multiplier * m.side_multiplier * price_multiplier
             ) points
         from
             multipliers m
+            join rewards.params p on m.event_date = p.reward_date
+        where
+            eligible
         group by
             market_id,
             account_id,
@@ -268,22 +310,4 @@ create view rewards.leaderboard_v2 as (
         rewards.shares_v2
 );
 
--- select
---     *
--- from
---     rewards.leaderboard_v2
--- where
---     event_date = '2022-09-19';
-select
-    account_id,
-    points,
-    share
-from
-    rewards.shares_v2
-    cross join rewards.const const
-where
-    event_date = '2022-09-19'
-order by
-    points desc;
-
-rollback;
+end;
