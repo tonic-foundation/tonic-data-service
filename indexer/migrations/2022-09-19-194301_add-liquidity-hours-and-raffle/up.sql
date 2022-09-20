@@ -53,12 +53,8 @@ create unique index rollover_points__account_id_from_date on rewards.rollover_po
 --  |         +------+ order cancelled
 --  |________________|_______________________ time ->
 --
-create view rewards.usn_rewards_calculator_v2 as (
-    with const as (
-        select
-            1000000000000000000 one_usn
-    ),
-    limit_order_events as (
+create view rewards.order_reduction_events as (
+    with limit_order_events as (
         -- table with one row for each event: created, filled, cancelled
         -- along with the decrease in size 
         select
@@ -69,6 +65,8 @@ create view rewards.usn_rewards_calculator_v2 as (
             created_at event_ts,
             order_id,
             id order_number,
+            limit_price,
+            side as original_side,
             quantity original_size,
             null decrement_amount
         from
@@ -83,6 +81,8 @@ create view rewards.usn_rewards_calculator_v2 as (
             f.created_at event_ts,
             o.order_id,
             o.id order_number,
+            o.limit_price,
+            o.side as original_side,
             o.quantity original_size,
             f.fill_qty decrement_amount
         from
@@ -98,37 +98,40 @@ create view rewards.usn_rewards_calculator_v2 as (
             c .created_at event_ts,
             o.order_id,
             o.id order_number,
+            o.limit_price,
+            o.side as original_side,
             o.quantity original_size,
             coalesce(c .cancelled_qty, o.quantity) decrement_amount -- column is null for 2022-09-19 and before
         from
             order_event o
             join cancel_event c on o.order_id = c .order_id
-    ),
-    -- Liquidity from previous day is counted in rollover_points. Thus, hours
+    ) -- Liquidity from previous day is counted in rollover_points. Thus, hours
     -- between events maxes out at 24h to avoid double count
-    hours_between_events as (
-        select
-            *,
-            least(
-                extract(
-                    epoch
-                    from
-                        (event_ts - order_created_at) / 3600
-                ),
-                24
-            ) as hours_between
-        from
-            limit_order_events
-    ),
-    dollar_hours_per_day as (
+    select
+        *,
+        least(
+            extract(
+                epoch
+                from
+                    (event_ts - order_created_at) / 3600
+            ),
+            24
+        ) as hours_between
+    from
+        limit_order_events
+);
+
+-- this gets new points earned today. does not account for rollover points
+create view rewards.usn_rewards_calculator_v2 as (
+    with dollar_hours_per_day as (
         -- gives dollar_hours *up to 24h previous*
         select
             *,
             date(event_ts) event_date,
             decrement_amount :: numeric * hours_between / const.one_usn dollar_hours
         from
-            hours_between_events
-            cross join const
+            rewards.order_reduction_events
+            cross join rewards.const const
     ),
     multipliers as (
         select
@@ -192,11 +195,14 @@ create view rewards.usn_rewards_calculator_v2 as (
         and market_id = const.usn_usdc_market_id
 );
 
+-- gets shares claimed today, accounting for rollover points
 create view rewards.shares_v2 as (
     with daily_total_points as (
         select
             urc. *,
-            sum(urc.points) over(partition by event_date) total_points
+            coalesce(rp.points, 0) rollover_points,
+            -- all traders
+            sum(urc.points + coalesce(rp.points, 0)) over(partition by event_date) total_points
         from
             rewards.usn_rewards_calculator_v2 urc full
             outer join rewards.rollover_points rp on urc.account_id = rp.account_id
@@ -205,9 +211,10 @@ create view rewards.shares_v2 as (
     shares as (
         select
             *,
-            points / total_points share
+            -- your points / all points
+            (points + rollover_points) / total_points share
         from
-            daily_total_points
+            daily_total_points dtp
     )
     select
         account_id,
@@ -231,9 +238,6 @@ create view rewards.leaderboard_v2 as (
         rewards.shares_v2
 );
 
--- function for returning points given inputs and a date. used in the points
--- calculator, but also used by the rollover points script to ensure that
--- rollover points are computed the same way as normal points
 create function rewards.calculate_points_v2(
     limit_price numeric,
     amount numeric,
@@ -241,38 +245,32 @@ create function rewards.calculate_points_v2(
     side text,
     event_type text,
     params_date date
-) returns numeric as $$ with asdf as (
-    with multipliers as (
-        select
-            params.max_price_multiplier / rewards.bumper(
-                abs(
-                    (limit_price - const.one_usdc) / 100
-                )
-            ) price_multiplier,
-            -- buys help maintain the peg so they get 2x boost
-            case
-                when side = 'sell' then 1
-                else 2
-            end side_multiplier,
-            case
-                when event_type = 'filled' then params.fill_multiplier
-                else 1
-            end fill_multiplier
-        from
-            rewards.params
-            cross join rewards.const const
-        where
-            reward_date = params_date
-    )
+) returns numeric as $$ with multipliers as (
     select
-        hours_on_book * amount * price_multiplier * side_multiplier * fill_multiplier
+        params.max_price_multiplier / rewards.bumper(
+            abs(
+                (limit_price - const.one_usdc) / 100
+            )
+        ) price_multiplier,
+        -- buys help maintain the peg so they get 2x boost
+        case
+            when side = 'sell' then 1
+            else 2
+        end side_multiplier,
+        case
+            when event_type = 'filled' then coalesce(params.fill_multiplier, 1)
+            else 1
+        end fill_multiplier
     from
-        multipliers
+        rewards.params
+        cross join rewards.const const
+    where
+        reward_date = params_date
 )
 select
-    *
+    hours_on_book * amount * price_multiplier * side_multiplier * fill_multiplier points
 from
-    asdf;
+    multipliers;
 
 $$ language sql;
 
@@ -283,13 +281,15 @@ $$ language sql;
 -- where
 --     event_date = '2022-09-19';
 select
-    *,
-    rewards.calculate_points_v2(1, 1, 1, 'sell', 'cancelled', '2022-09-20') foo
+    account_id,
+    points,
+    share
 from
     rewards.shares_v2
+    cross join rewards.const const
 where
-    event_date = current_date
+    event_date = '2022-09-19'
 order by
-    share desc;
+    points desc;
 
 rollback;
