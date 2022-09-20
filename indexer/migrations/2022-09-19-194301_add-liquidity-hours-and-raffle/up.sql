@@ -1,15 +1,32 @@
 begin
 ;
 
-create type payout_source as enum('lp', 'raffle');
+create type rewards.payout_source as enum('lp_reward', 'raffle');
 
+-- We'll sometimes do raffles to drive DAUs. Raffle payouts will show in the
+-- payout history view. A flag to differentiate raffles and LP rewards lets
+-- us do more with the UI.
 alter table
     rewards.payouts
 add
-    -- other value is raffle
-    column source payout_source default 'lp';
+    column source rewards.payout_source default 'lp_reward';
+
+-- Fills will get a slight boost under the new system. for audit reasons,
+-- previous days will have default 1
+alter table
+    rewards.params
+add
+    column fill_multiplier numeric default 1;
 
 -- Rollover points are computed in app code using params from from_date.
+-- They're basically liquidity hours for the portion of orders still open at the
+-- end of the day (ie, not filled or cancelled), which carry over to the next
+-- day. The formula in app code matches that in usn_rewards_calculator_v2. We do
+-- this per-day segmentation because we do daily payouts. The reason for
+-- carrying over to the next day instead of applying to the current day is that
+-- the live leaderboard can't account for rollover points until the day ends,
+-- which could cause a jump in points. Applying it to the next day makes the
+-- payouts more predictable for the user.
 create table rewards.rollover_points (
     account_id text,
     points numeric,
@@ -175,33 +192,104 @@ create view rewards.usn_rewards_calculator_v2 as (
         and market_id = const.usn_usdc_market_id
 );
 
-with all_points as (
+create view rewards.shares_v2 as (
+    with daily_total_points as (
+        select
+            urc. *,
+            sum(urc.points) over(partition by event_date) total_points
+        from
+            rewards.usn_rewards_calculator_v2 urc full
+            outer join rewards.rollover_points rp on urc.account_id = rp.account_id
+            and rp.from_date = date(urc.event_date - interval '1 day')
+    ),
+    shares as (
+        select
+            *,
+            points / total_points share
+        from
+            daily_total_points
+    )
     select
-        *,
-        sum(points) over(partition by event_date) total_points
+        account_id,
+        event_date,
+        trunc(points, 4) points,
+        trunc(total_points, 4) total_points,
+        trunc(share * 100, 4) share
     from
-        rewards.usn_rewards_calculator_v2
-),
-shares as (
+        shares
+);
+
+create view rewards.leaderboard_v2 as (
     select
-        *,
-        points / total_points share
+        dense_rank() over (
+            partition by event_date
+            order by
+                points desc
+        ) ranking,
+        *
     from
-        all_points
+        rewards.shares_v2
+);
+
+-- function for returning points given inputs and a date. used in the points
+-- calculator, but also used by the rollover points script to ensure that
+-- rollover points are computed the same way as normal points
+create function rewards.calculate_points_v2(
+    limit_price numeric,
+    amount numeric,
+    hours_on_book numeric,
+    side text,
+    event_type text,
+    params_date date
+) returns numeric as $$ with asdf as (
+    with multipliers as (
+        select
+            params.max_price_multiplier / rewards.bumper(
+                abs(
+                    (limit_price - const.one_usdc) / 100
+                )
+            ) price_multiplier,
+            -- buys help maintain the peg so they get 2x boost
+            case
+                when side = 'sell' then 1
+                else 2
+            end side_multiplier,
+            case
+                when event_type = 'filled' then params.fill_multiplier
+                else 1
+            end fill_multiplier
+        from
+            rewards.params
+            cross join rewards.const const
+        where
+            reward_date = params_date
+    )
+    select
+        hours_on_book * amount * price_multiplier * side_multiplier * fill_multiplier
+    from
+        multipliers
 )
 select
-    account_id,
-    event_date,
-    trunc(points, 4) points,
-    trunc(total_points, 4) total_points,
-    trunc(share * 100, 4) share
+    *
 from
-    shares
+    asdf;
+
+$$ language sql;
+
+-- select
+--     *
+-- from
+--     rewards.leaderboard_v2
+-- where
+--     event_date = '2022-09-19';
+select
+    *,
+    rewards.calculate_points_v2(1, 1, 1, 'sell', 'cancelled', '2022-09-20') foo
+from
+    rewards.shares_v2
 where
-    event_date = '2022-09-19'
+    event_date = current_date
 order by
-    points desc
-limit
-    500;
+    share desc;
 
 rollback;
