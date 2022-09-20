@@ -121,6 +121,42 @@ create view rewards.order_reduction_events as (
         limit_order_events
 );
 
+create function rewards.calculate_points_v2(
+    limit_price numeric,
+    amount numeric,
+    hours_on_book numeric,
+    side text,
+    event_type text,
+    params_date date
+) returns numeric as $$ with multipliers as (
+    select
+        params.max_price_multiplier / rewards.bumper(
+            abs(
+                (limit_price - const.one_usdc) / 100
+            )
+        ) price_multiplier,
+        -- buys help maintain the peg so they get 2x boost
+        case
+            when side = 'sell' then 1
+            else 2
+        end side_multiplier,
+        case
+            when event_type = 'filled' then coalesce(params.fill_multiplier, 1)
+            else 1
+        end fill_multiplier
+    from
+        rewards.params
+        cross join rewards.const const
+    where
+        reward_date = params_date
+)
+select
+    hours_on_book * amount * price_multiplier * side_multiplier * fill_multiplier points
+from
+    multipliers;
+
+$$ language sql;
+
 -- this gets new points earned today. does not account for rollover points
 create view rewards.usn_rewards_calculator_v2 as (
     with dollar_hours_per_day as (
@@ -145,22 +181,9 @@ create view rewards.usn_rewards_calculator_v2 as (
                     where
                         ea.account_id = d.account_id
                 )
-            ) :: int eligibility_multiplier,
-            params.max_price_multiplier / rewards.bumper(
-                abs(
-                    (o.limit_price :: numeric - const.one_usdc) / 100
-                )
-            ) price_multiplier,
-            -- buys help maintain the peg so they get 2x boost
-            case
-                when o.side = 'sell' then 1
-                else 2
-            end side_multiplier
+            ) :: int eligibility_multiplier
         from
-            dollar_hours_per_day d full
-            outer join order_event o on o.id = d.order_number
-            join rewards.params params on params.reward_date = event_date
-            cross join rewards.const const
+            dollar_hours_per_day d
     ),
     -- At this point, we _could_ calculate remaining open quantities in sql to
     -- compute rollover points, but since points depend on price as well, the query
@@ -174,7 +197,14 @@ create view rewards.usn_rewards_calculator_v2 as (
             -- NOTE: the time divisor has been removed, since it has no effect on
             -- the current formula besides scaling
             sum(
-                dollar_hours * m.eligibility_multiplier * m.side_multiplier * price_multiplier
+                rewards.calculate_points_v2(
+                    limit_price :: numeric,
+                    decrement_amount :: numeric,
+                    hours_between,
+                    original_side,
+                    event_type,
+                    event_date
+                ) -- dollar_hours * m.eligibility_multiplier * m.side_multiplier * price_multiplier
             ) points
         from
             multipliers m
@@ -237,42 +267,6 @@ create view rewards.leaderboard_v2 as (
     from
         rewards.shares_v2
 );
-
-create function rewards.calculate_points_v2(
-    limit_price numeric,
-    amount numeric,
-    hours_on_book numeric,
-    side text,
-    event_type text,
-    params_date date
-) returns numeric as $$ with multipliers as (
-    select
-        params.max_price_multiplier / rewards.bumper(
-            abs(
-                (limit_price - const.one_usdc) / 100
-            )
-        ) price_multiplier,
-        -- buys help maintain the peg so they get 2x boost
-        case
-            when side = 'sell' then 1
-            else 2
-        end side_multiplier,
-        case
-            when event_type = 'filled' then coalesce(params.fill_multiplier, 1)
-            else 1
-        end fill_multiplier
-    from
-        rewards.params
-        cross join rewards.const const
-    where
-        reward_date = params_date
-)
-select
-    hours_on_book * amount * price_multiplier * side_multiplier * fill_multiplier points
-from
-    multipliers;
-
-$$ language sql;
 
 -- select
 --     *
