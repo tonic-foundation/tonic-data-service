@@ -1,22 +1,2 @@
-// Routes for USN rewards program.
-import { FastifyInstance } from 'fastify';
-import eligibility from './eligibility';
-
-import history from './history';
-import payouts from './payouts';
-import parameters from './parameters';
-import stats from './stats';
-import unfinalized from './unfinalized';
-import leaderboard from './leaderboard';
-
-export default function registerRewardsRoutes(api: FastifyInstance, _: unknown, done: () => unknown) {
-  api.register(eligibility);
-  api.register(history);
-  api.register(leaderboard);
-  api.register(parameters);
-  api.register(payouts);
-  api.register(stats);
-  api.register(unfinalized);
-
-  done();
-}
+export { default as rewardsV1Routes } from './v1';
+export { default as rewardsV2Routes } from './v2';
