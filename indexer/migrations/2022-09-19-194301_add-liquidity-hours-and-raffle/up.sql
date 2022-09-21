@@ -16,22 +16,20 @@ alter table
 add
     column source rewards.payout_source default 'lp_reward';
 
--- Fills will get a slight boost under the new system. for audit reasons,
--- previous days will have default 1
+-- Fills get a slight boost under the new system.
 alter table
     rewards.params
 add
     column fill_multiplier numeric default 1;
 
--- Rollover points are computed in app code using params from from_date.
--- They're basically liquidity hours for the portion of orders still open at the
--- end of the day (ie, not filled or cancelled), which carry over to the next
--- day. The formula in app code matches that in usn_rewards_calculator_v2. We do
--- this per-day segmentation because we do daily payouts. The reason for
--- carrying over to the next day instead of applying to the current day is that
--- the live leaderboard can't account for rollover points until the day ends,
--- which could cause a jump in points. Applying it to the next day makes the
--- payouts more predictable for the user.
+-- Rollover points are computed using calculate_points_v2 (query is sent from
+-- app code)
+--
+-- Since we get rollover orders using RPC, a few extra fields are saved here for
+-- auditability.
+--
+-- (We could technically compute remaining order size in SQL; it's not that
+-- hard, but it is very slow)
 create table rewards.rollover_orders (
     account_id text,
     order_id text,
@@ -43,6 +41,7 @@ create table rewards.rollover_orders (
 
 create unique index rollover_points__account_id_from_date on rewards.rollover_orders(account_id, order_id, from_date);
 
+-- convenience view makes rollover points easier to include in the day's shares
 create view rewards.rollover_points as (
     select
         account_id,
@@ -55,15 +54,18 @@ create view rewards.rollover_points as (
         from_date
 );
 
--- note: this only includes fills *when you're the maker*
--- so it's not generally usable as an "order reduction events" table
+-- Make a single view for all the inputs for live points computation.
 --
 -- roughly, the way we compute points is: every time an order decreases for
 -- eligible causes (cancel, filled by a taker), we compute:
 --
---   liquidity hours = decrement amount * hours on book 
+--   liquidity hours = decrement amount * hours on book * multipliers
 --
--- apply some multipliers and that's the points
+-- at the end of the day, orders that are still open are rolled over in a cron
+-- job (see rewards.rollover_orders)
+--
+-- note: this only includes fills *when you're the maker*. your own taker volume
+-- doesn't contribute points
 create view rewards.points_v2_inputs as (
     with limit_order_events as (
         -- table with one row for each event: created, filled, cancelled
@@ -140,6 +142,7 @@ create view rewards.points_v2_inputs as (
         event_ts > const.start_date
 );
 
+-- currently unused, but gives liquidity hours per order
 create view rewards.usn_liquidity_hours as (
     select
         o. *,
@@ -154,6 +157,7 @@ create view rewards.usn_liquidity_hours as (
         market_id = const.usn_usdc_market_id
 );
 
+-- used in both the leaderboard here and the cron job for rollover points
 create function rewards.calculate_points_v2 (
     limit_price numeric,
     amount numeric,
@@ -195,11 +199,13 @@ multipliers as (
 select
     -- dollar hours x multipliers
     -- divide by 1 usn
-    -- divide by 100 because the points add up too quickly without...
+    -- divide by 100 because the points add up too quickly if you don't scale,
+    -- and they start to feel meaningless
     --
-    -- for scale, about 10 dollar bid liquidity at 1.0000 for the day would be
-    -- 10 * 24 * 5 * 2 * 1 = 2400 (points seem meaningless) scaled down it would
-    -- be 24
+    -- for example, 10 $USN resting bid at 1.0000 for the day would be 10 * 24 *
+    -- 5 * 2 * 1 = 2400 points. Most people are placing bigger orders and
+    -- getting filled; eg., top trader from 2022-09-19 had around 300k points.
+    -- Scaling down makes each point feel a bit more substantial.
     --
     -- for some reason, a cross join on rewards here slows things to a crawl, so one_usn is hard coded...
     amount * hours_on_book * price_multiplier * side_multiplier * fill_multiplier / 1000000000000000000 / 100 points
@@ -243,13 +249,13 @@ create view rewards.usn_rewards_calculator_v2 as (
                     p.eligible_bp_distance,
                     p.max_price_multiplier,
                     p.fill_multiplier
-                ) -- dollar_hours * m.eligibility_multiplier * m.side_multiplier * price_multiplier
+                )
             ) points
         from
             multipliers m
             join rewards.params p on m.event_date = p.reward_date
         where
-            eligible
+            eligible -- this used to be a multiplier but is a boolean now
         group by
             market_id,
             account_id,
@@ -267,7 +273,7 @@ create view rewards.usn_rewards_calculator_v2 as (
         and market_id = const.usn_usdc_market_id
 );
 
--- gets shares claimed today, accounting for rollover points
+-- get shares for a given day, accounting for rollover points from the previous
 create view rewards.shares_v2 as (
     with daily_total_points as (
         select

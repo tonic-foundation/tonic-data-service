@@ -4,18 +4,20 @@
  * ; yarn ts-node scripts/rewards/get-rollover-points.ts
  */
 import { Account, Near } from 'near-api-js';
-import { getNearConfig } from '@tonic-foundation/config';
-import { Tonic } from '@tonic-foundation/tonic';
+import { getNearConfig, NearEnv } from '@tonic-foundation/config';
 import { InMemoryKeyStore } from 'near-api-js/lib/key_stores';
 import { parse } from 'ts-command-line-args';
 import { getDbConnectConfig } from '../../src/config';
 import getConnection from 'knex';
-import { assertValidDate, prompt } from './util';
-import BN from 'bn.js';
+import { assertValidDate } from './util';
 
 const knex = getConnection(getDbConnectConfig());
 
-const { NEAR_ENV, TONIC_CONTRACT_ID, USN_MARKET_ID = 'J5mggeEGCyXVUibvYTe9ydVBrELECRUu23VRk2TwC2is' } = process.env;
+const {
+  NEAR_ENV,
+  TONIC_CONTRACT_ID = 'v1.orderbook.near',
+  USN_MARKET_ID = 'J5mggeEGCyXVUibvYTe9ydVBrELECRUu23VRk2TwC2is',
+} = process.env;
 
 export interface CliOptions {
   'dry-run'?: boolean;
@@ -27,19 +29,17 @@ export const args = parse<CliOptions>({
   date: { type: String },
 });
 
-interface RolloverPoints {
-  account_id: string;
-  points: number;
-  from_date: string;
-}
-
 async function saveRolloverPoints(ob: OrderbookHack, date: string) {
   try {
     await knex.transaction(async (t) => {
       for (const order of [...ob.bids, ...ob.asks]) {
-        // note: the event type doesn't matter as long as it's not filled
-        // note the "least" thing in calculate points :skull:
-        // spot-checked with wolframalpha and this looks right... :skull:
+        // spot-checked with wolframalpha and looks okay... 💀💀💀
+        //
+        // this *saves* the full time on the book for auditability but
+        // calculates with the 24h cap
+        //
+        // note: the event_type arg to calculate_points_v2 doesn't matter as
+        // long as the value isn't 'filled'
         await t.raw(
           `
           with time_on_book as (
@@ -111,7 +111,7 @@ interface OrderbookHack<T = string> {
  * values, and calculator function skips ineligibly-priced orders
  */
 async function getOrderbook(account: Account, marketId = USN_MARKET_ID) {
-  const ob: OrderbookHack = await account.viewFunction(TONIC_CONTRACT_ID!, 'get_orderbook', {
+  const ob: OrderbookHack = await account.viewFunction(TONIC_CONTRACT_ID, 'get_orderbook', {
     market_id: marketId,
     depth: 5, // only allow this many bps anyway
     show_owner: true,
@@ -129,7 +129,7 @@ async function run() {
   assertValidDate(args['date']);
 
   const near = new Near({
-    ...getNearConfig(NEAR_ENV as any),
+    ...getNearConfig(NEAR_ENV as NearEnv),
     keyStore: new InMemoryKeyStore(),
   });
   const account = await near.account('dontcare');
