@@ -45,7 +45,7 @@ create unique index rollover_points__account_id_from_date on rewards.rollover_or
 create view rewards.rollover_points as (
     select
         account_id,
-        from_date,
+        date(from_date + interval '1 day') qualifying_date,
         sum(points) points
     from
         rewards.rollover_orders
@@ -208,7 +208,10 @@ select
     -- Scaling down makes each point feel a bit more substantial.
     --
     -- for some reason, a cross join on rewards here slows things to a crawl, so one_usn is hard coded...
-    amount * hours_on_book * price_multiplier * side_multiplier * fill_multiplier / 1000000000000000000 / 100 points
+    coalesce(
+        amount * hours_on_book * price_multiplier * side_multiplier * fill_multiplier / 1000000000000000000 / 100,
+        0
+    ) points
 from
     multipliers;
 
@@ -269,39 +272,72 @@ create view rewards.usn_rewards_calculator_v2 as (
         points_calculator
         cross join rewards.const const
     where
-        points is not null -- not sure this can happen
-        and market_id = const.usn_usdc_market_id
+        market_id = const.usn_usdc_market_id
 );
 
 -- get shares for a given day, accounting for rollover points from the previous
+-- XXX: bug, returns 2 rows if you have rollover points and earned points, but
+-- they're identical so app code doesn't care.
 create view rewards.shares_v2 as (
-    with daily_total_points as (
+    with qualifying_points as (
         select
-            urc. *,
-            coalesce(rp.points, 0) rollover_points,
-            -- all traders
-            sum(urc.points + coalesce(rp.points, 0)) over(partition by event_date) total_points
+            account_id,
+            0 points,
+            points rollover_points,
+            qualifying_date event_date
         from
-            rewards.usn_rewards_calculator_v2 urc full
-            outer join rewards.rollover_points rp on urc.account_id = rp.account_id
-            and rp.from_date = date(urc.event_date - interval '1 day')
+            rewards.rollover_points
+        union
+        select
+            account_id,
+            points,
+            0 rollover_points,
+            event_date
+        from
+            rewards.usn_rewards_calculator_v2
+    ),
+    daily_total_points as (
+        select
+            event_date,
+            sum(points + rollover_points) all_traders_points
+        from
+            qualifying_points
+        group by
+            event_date
+    ),
+    trader_points as (
+        select
+            account_id,
+            event_date,
+            sum(points) earned_points,
+            sum(rollover_points) rollover_points
+        from
+            qualifying_points
+        group by
+            account_id,
+            event_date
     ),
     shares as (
         select
-            *,
-            -- your points / all points
-            (points + rollover_points) / total_points share
+            t. *,
+            d.all_traders_points,
+            (earned_points + rollover_points) / all_traders_points share
         from
-            daily_total_points dtp
+            daily_total_points d
+            join trader_points t on d.event_date = t.event_date
     )
     select
         account_id,
         event_date,
-        trunc(points, 4) points,
-        trunc(total_points, 4) total_points,
+        trunc(earned_points, 4) earned_points,
+        trunc(rollover_points, 4) rollover_points,
+        trunc(earned_points + rollover_points, 4) points,
+        trunc(all_traders_points, 4) all_traders_points,
         trunc(share * 100, 4) share
     from
         shares
+    where
+        share > 0
 );
 
 create view rewards.leaderboard_v2 as (
