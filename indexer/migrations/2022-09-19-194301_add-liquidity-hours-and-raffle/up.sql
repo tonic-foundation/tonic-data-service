@@ -333,7 +333,7 @@ create view rewards.shares_v2 as (
         trunc(rollover_points, 4) rollover_points,
         trunc(earned_points + rollover_points, 4) points,
         trunc(all_traders_points, 4) all_traders_points,
-        trunc(share * 100, 4) share
+        trunc(share, 4) share
     from
         shares
     where
