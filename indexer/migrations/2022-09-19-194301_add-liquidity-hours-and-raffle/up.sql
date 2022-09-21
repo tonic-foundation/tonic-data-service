@@ -276,8 +276,6 @@ create view rewards.usn_rewards_calculator_v2 as (
 );
 
 -- get shares for a given day, accounting for rollover points from the previous
--- XXX: bug, returns 2 rows if you have rollover points and earned points, but
--- they're identical so app code doesn't care.
 create view rewards.shares_v2 as (
     with qualifying_points as (
         select
