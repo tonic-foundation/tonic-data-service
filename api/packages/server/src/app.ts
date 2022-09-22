@@ -10,6 +10,7 @@ import marketUtilsPlugin from './plugins/marketUtils';
 import metricsPlugin from './plugins/metrics';
 import sentryPlugin from './plugins/sentry';
 import { apiV1Routes, coinMarketCapV1Routes, leaderboardRoutes, makeTvRouter, rewardsRoutes } from './routes';
+import { rewardsV1Routes, rewardsV2Routes } from './routes/rewards';
 
 const config = getConfig();
 
@@ -57,7 +58,8 @@ server.register(apiV1Routes, { prefix: '/api/v1' });
 server.register(makeTvRouter('Tonic'), { prefix: '/tv' });
 
 server.register(leaderboardRoutes, { prefix: '/leaderboard' });
-server.register(rewardsRoutes, { prefix: '/rewards' });
+server.register(rewardsV1Routes, { prefix: '/rewards/v1' });
+server.register(rewardsV2Routes, { prefix: '/rewards/v2' });
 
 // coinmarketcap routes
 server.register(coinMarketCapV1Routes, { prefix: '/external/coinmarketcap/v1' });

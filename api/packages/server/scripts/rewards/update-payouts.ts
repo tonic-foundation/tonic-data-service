@@ -115,7 +115,8 @@ async function run() {
     await prompt('Press [ENTER] to save');
 
     console.log('saving');
-    await savePayouts(payouts);
+    // whatever lol
+    await savePayouts(payouts.map((p) => ({ ...p, paid_in_tx_id: args.paid_in_tx_id! })));
   }
 }
 
