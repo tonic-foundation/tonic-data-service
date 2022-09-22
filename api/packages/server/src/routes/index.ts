@@ -3,4 +3,4 @@ export { default as coinMarketCapV1Routes } from './external/coinmarketcap-v1';
 export { makeTvRouter } from './tv';
 
 export { default as leaderboardRoutes } from './leaderboard';
-export { default as rewardsRoutes } from './rewards';
+export { rewardsV1Routes, rewardsV2Routes } from './rewards';

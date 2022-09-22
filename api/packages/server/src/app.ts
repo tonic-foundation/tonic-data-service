@@ -9,8 +9,14 @@ import dbPlugin from './plugins/db';
 import marketUtilsPlugin from './plugins/marketUtils';
 import metricsPlugin from './plugins/metrics';
 import sentryPlugin from './plugins/sentry';
-import { apiV1Routes, coinMarketCapV1Routes, leaderboardRoutes, makeTvRouter, rewardsRoutes } from './routes';
-import { rewardsV1Routes, rewardsV2Routes } from './routes/rewards';
+import {
+  apiV1Routes,
+  coinMarketCapV1Routes,
+  leaderboardRoutes,
+  makeTvRouter,
+  rewardsV1Routes,
+  rewardsV2Routes,
+} from './routes';
 
 const config = getConfig();
 
