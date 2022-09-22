@@ -127,10 +127,13 @@ create view rewards.points_v2_inputs as (
             extract(
                 epoch
                 from
-                    (event_ts - order_created_at) / 3600
+                    (
+                        -- only count up to start of the day to avoid a double count
+                        event_ts - greatest(order_created_at, date(event_ts))
+                    ) / 3600
             ),
             24
-        ) as hours_on_book
+        ) as eligible_hours_on_book
     from
         limit_order_events o
         cross join rewards.const const
@@ -148,7 +151,7 @@ create view rewards.usn_liquidity_hours as (
         o. *,
         -- total for this order in this market
         sum(
-            decrement_amount :: numeric / const.one_usn * hours_on_book
+            decrement_amount :: numeric / const.one_usn * eligible_hours_on_book
         ) over (partition by market_id, order_id) total_usn_hours
     from
         rewards.points_v2_inputs o
@@ -182,11 +185,12 @@ multipliers as (
             when bp_distance > eligible_bp_distance then 0
             else max_price_multiplier / rewards.bumper(bp_distance)
         end price_multiplier,
-        -- usn bids help maintain the peg so they get 2x boost
-        case
-            when side = 'buy' then 2
-            else 1
-        end side_multiplier,
+        -- -- usn bids help maintain the peg so they get 2x boost
+        -- NOTE: side boost has been removed, way too strong
+        -- case
+        --     when side = 'buy' then 2
+        --     else 1
+        -- end side_multiplier,
         -- fills get slight boost
         case
             when event_type = 'filled' then coalesce(fill_multiplier, 1)
@@ -209,7 +213,8 @@ select
     --
     -- for some reason, a cross join on rewards here slows things to a crawl, so one_usn is hard coded...
     coalesce(
-        amount * hours_on_book * price_multiplier * side_multiplier * fill_multiplier / 1000000000000000000 / 100,
+        -- NOTE: side boost has been removed, way too strong
+        amount * hours_on_book * price_multiplier * fill_multiplier / 1000000000000000000 / 100,
         0
     ) points
 from
@@ -246,7 +251,7 @@ create view rewards.usn_rewards_calculator_v2 as (
                 rewards.calculate_points_v2(
                     limit_price :: numeric,
                     decrement_amount :: numeric,
-                    hours_on_book,
+                    eligible_hours_on_book,
                     original_side,
                     event_type,
                     p.eligible_bp_distance,
