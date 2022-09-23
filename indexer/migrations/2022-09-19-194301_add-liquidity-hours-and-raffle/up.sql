@@ -1,16 +1,12 @@
--- v2: Points are usn amount * hours on the book * some multipliers determined
--- by the price, side, etc.
+-- v2: Points are usn amount * hours on the book * price multiplier * fill multiplier
 --
--- This is actually almost the same as v1, but includes the concept of rollover
--- points for portion of order still open at the end of the day
+-- This is almost the same as v1, but includes the concept of rollover points
+-- for portion of order still open at the end of the day
 begin
 ;
 
 create type rewards.payout_source as enum('lp_reward', 'raffle');
 
--- We'll sometimes do raffles to drive DAUs. Raffle payouts will show in the
--- payout history view. A flag to differentiate raffles and LP rewards lets
--- us do more with the UI.
 alter table
     rewards.payouts
 add
@@ -28,8 +24,8 @@ add
 -- Since we get rollover orders using RPC, a few extra fields are saved here for
 -- auditability.
 --
--- (We could technically compute remaining order size in SQL; it's not that
--- hard, but it is very slow)
+-- (We could technically compute remaining order size in SQL; it's not hard, but
+-- it is very slow)
 create table rewards.rollover_orders (
     account_id text,
     order_id text,
@@ -39,7 +35,7 @@ create table rewards.rollover_orders (
     from_date date
 );
 
-create unique index rollover_points__account_id_from_date on rewards.rollover_orders(account_id, order_id, from_date);
+create unique index rollover_points__account_id_from_date on rewards.rollover_orders(account_id, order_id, from_date, source);
 
 -- convenience view makes rollover points easier to include in the day's shares
 create view rewards.rollover_points as (
@@ -138,10 +134,6 @@ create view rewards.points_v2_inputs as (
         limit_order_events o
         cross join rewards.const const
     where
-        -- this speeds things up tremendously. reason: everything is done with
-        -- partitions on event_date, but we only have index for timestamp, so
-        -- we have to do full scan. this constraint lets us use the timestamp
-        -- index first to reduce the amount we have to scan
         event_ts > const.start_date
 );
 
@@ -160,7 +152,7 @@ create view rewards.usn_liquidity_hours as (
         market_id = const.usn_usdc_market_id
 );
 
--- used in both the leaderboard here and the cron job for rollover points
+-- used in both the leaderboard and the cron job for rollover points
 create function rewards.calculate_points_v2 (
     limit_price numeric,
     amount numeric,
@@ -211,9 +203,10 @@ select
     -- getting filled; eg., top trader from 2022-09-19 had around 300k points.
     -- Scaling down makes each point feel a bit more substantial.
     --
-    -- for some reason, a cross join on rewards here slows things to a crawl, so one_usn is hard coded...
+    -- for some reason, a cross join on rewards here slows things to a crawl, so one_usn is hard coded
     coalesce(
         -- NOTE: side boost has been removed, way too strong
+        -- 18 zeroes for one usn
         amount * hours_on_book * price_multiplier * fill_multiplier / 1000000000000000000 / 100,
         0
     ) points
@@ -222,7 +215,7 @@ from
 
 $$ language sql;
 
--- this gets new points earned today. does not account for rollover points
+-- view for new points earned on a given date. does not account for rollover points
 create view rewards.usn_rewards_calculator_v2 as (
     with multipliers as (
         select
@@ -280,7 +273,7 @@ create view rewards.usn_rewards_calculator_v2 as (
         market_id = const.usn_usdc_market_id
 );
 
--- get shares for a given day, accounting for rollover points from the previous
+-- get shares for a given day, accounting for rollover points
 create view rewards.shares_v2 as (
     with qualifying_points as (
         select

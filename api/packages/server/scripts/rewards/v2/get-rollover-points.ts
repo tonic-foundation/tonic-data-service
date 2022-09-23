@@ -1,5 +1,5 @@
 /**
- * Oh god.
+ * 'date' param is the date to roll over from
  *
  * ; yarn ts-node scripts/rewards/get-rollover-points.ts
  */
@@ -7,9 +7,9 @@ import { Account, Near } from 'near-api-js';
 import { getNearConfig, NearEnv } from '@tonic-foundation/config';
 import { InMemoryKeyStore } from 'near-api-js/lib/key_stores';
 import { parse } from 'ts-command-line-args';
-import { getDbConnectConfig } from '../../src/config';
+import { getDbConnectConfig } from '../../../src/config';
 import getConnection from 'knex';
-import { assertValidDate } from './util';
+import { assertValidDate } from '../util';
 
 const knex = getConnection(getDbConnectConfig());
 
@@ -33,10 +33,8 @@ async function saveRolloverPoints(ob: OrderbookHack, date: string) {
   try {
     await knex.transaction(async (t) => {
       for (const order of [...ob.bids, ...ob.asks]) {
-        // spot-checked with wolframalpha and looks okay... 💀💀💀
-        //
-        // this *saves* the full time on the book for auditability but
-        // calculates with the 24h cap
+        // this saves the full time on the book for auditability but calculates
+        // with the 24h cap
         //
         // note: the event_type arg to calculate_points_v2 doesn't matter as
         // long as the value isn't 'filled'
@@ -134,7 +132,7 @@ async function run() {
   });
   const account = await near.account('dontcare');
 
-  // TODO: can't use tonic client, since it groups by price
+  // XXX: can't use tonic client, since it groups by price
   // const tonic = new Tonic(account, TONIC_CONTRACT_ID);
 
   const ob = await getOrderbook(account);

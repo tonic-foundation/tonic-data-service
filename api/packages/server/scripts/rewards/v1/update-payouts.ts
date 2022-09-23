@@ -8,20 +8,22 @@
  * ; yarn ts-node scripts/rewards/update-payouts.ts --reward_date 2022-09-12
  */
 import { parse } from 'ts-command-line-args';
-import { getDbConnectConfig } from '../../src/config';
+import { getDbConnectConfig } from '../../../src/config';
 import getConnection from 'knex';
-import { prompt } from './util';
+import { prompt } from '../util';
 
 const knex = getConnection(getDbConnectConfig());
 
 export interface CliOptions {
   'dry-run'?: boolean;
+  force?: boolean;
   paid_in_tx_id?: string;
   reward_date: string;
 }
 
 export const args = parse<CliOptions>({
   'dry-run': { type: Boolean, optional: true },
+  force: { type: Boolean, optional: true },
   paid_in_tx_id: { type: String, optional: true },
   reward_date: { type: String },
 });
@@ -92,6 +94,11 @@ async function savePayouts(payouts: Payout[]) {
 }
 
 async function run() {
+  if (!args.force) {
+    console.error("v1 update-payouts is deprecated. pass --force if you're sure you want this");
+    process.exit(1);
+  }
+
   if (!args['dry-run'] && !args['paid_in_tx_id']) {
     console.error('paid_in_tx_id must be provided when writing payouts');
     process.exit(1);

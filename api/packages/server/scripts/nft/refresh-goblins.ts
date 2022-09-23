@@ -83,9 +83,6 @@ async function run() {
     const held = res.length;
     const multiplier = getMultiplier(held);
 
-    // slow down for rate limit
-    await new Promise((resolve) => setTimeout(resolve, 750));
-
     console.log(id, 'holds', held, 'multiplier', multiplier);
     if (args['dry-run']) {
       console.log('(skipped saving due to dry run)');

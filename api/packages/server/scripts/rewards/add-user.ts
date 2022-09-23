@@ -6,7 +6,6 @@
 import { parse } from 'ts-command-line-args';
 import { getDbConnectConfig } from '../../src/config';
 import getConnection from 'knex';
-import { prompt } from './util';
 
 const knex = getConnection(getDbConnectConfig());
 
@@ -33,7 +32,7 @@ async function saveUser(account_ids: string[]) {
 
 async function run() {
   const accountIds = args.account_ids.split(',').map((a) => a.trim());
-  await prompt(`saving ${accountIds}\n\nPress [ENTER] to continue`);
+  console.log(`saving ${accountIds}\n`);
   await saveUser(accountIds);
   console.log('done');
 }
