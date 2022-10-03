@@ -73,6 +73,8 @@ table! {
         reference -> Nullable<Text>,
         reference_hash -> Nullable<Text>,
         created_at -> Nullable<Timestamp>,
+        stable -> Nullable<Bool>,
+        visible -> Nullable<Bool>,
     }
 }
 
