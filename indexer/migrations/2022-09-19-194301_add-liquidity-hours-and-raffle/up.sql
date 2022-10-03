@@ -12,6 +12,11 @@ alter table
 add
     column source rewards.payout_source default 'lp_reward';
 
+alter table
+    rewards.payouts
+add
+    constraint payouts_account_date_source_key unique(account_id, reward_date, source);
+
 -- Fills get a slight boost under the new system.
 alter table
     rewards.params

@@ -177,8 +177,7 @@ create table rewards.payouts (
     payout numeric,
     reward_date date,
     -- if set, means paid. if not, means pending payment
-    paid_in_tx_id text default null,
-    unique(account_id, reward_date)
+    paid_in_tx_id text default null
 );
 
 commit;
