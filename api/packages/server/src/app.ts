@@ -14,6 +14,7 @@ import {
   coinMarketCapV1Routes,
   leaderboardRoutes,
   makeTvRouter,
+  rebatesV1Routes,
   rewardsV1Routes,
   rewardsV2Routes,
 } from './routes';
@@ -64,8 +65,11 @@ server.register(apiV1Routes, { prefix: '/api/v1' });
 server.register(makeTvRouter('Tonic'), { prefix: '/tv' });
 
 server.register(leaderboardRoutes, { prefix: '/leaderboard' });
+
 server.register(rewardsV1Routes, { prefix: '/rewards/v1' });
 server.register(rewardsV2Routes, { prefix: '/rewards/v2' });
+
+server.register(rebatesV1Routes, { prefix: '/rebates/v1' });
 
 // coinmarketcap routes
 server.register(coinMarketCapV1Routes, { prefix: '/external/coinmarketcap/v1' });

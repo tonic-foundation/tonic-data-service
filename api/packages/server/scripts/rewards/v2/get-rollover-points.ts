@@ -9,7 +9,7 @@ import { InMemoryKeyStore } from 'near-api-js/lib/key_stores';
 import { parse } from 'ts-command-line-args';
 import { getDbConnectConfig } from '../../../src/config';
 import getConnection from 'knex';
-import { assertValidDate } from '../util';
+import { assertValidDate } from '../../util';
 
 const knex = getConnection(getDbConnectConfig());
 

@@ -4,3 +4,4 @@ export { makeTvRouter } from './tv';
 
 export { default as leaderboardRoutes } from './leaderboard';
 export { rewardsV1Routes, rewardsV2Routes } from './rewards';
+export { rebatesV1Routes } from './rebates';
