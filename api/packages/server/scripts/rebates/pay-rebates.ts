@@ -79,7 +79,9 @@ async function run() {
   // save the payouts in batches (nearsend can only send so many at a time, about 20 or so)
   const batches = batch(summaries);
   for (const [i, payoutBatch] of batches.entries()) {
-    console.log(`Batch ${i + 1} / ${batches.length}`);
+    const totalInBatch = payoutBatch.reduce((acc, c) => acc + parseFloat(c.outstanding), 0);
+    console.log(`Batch ${i + 1} / ${batches.length}, $${totalInBatch}`);
+
     console.log(payoutBatch.map((s) => [s.account_id, s.outstanding].join(',')).join('\n'), '\n');
 
     if (args['dry-run']) {
@@ -92,7 +94,7 @@ async function run() {
       paid_in_tx_id = await prompt('payment TX ID: ');
     }
 
-    console.log(`Total: ${totalOutstanding}, paid in ${paid_in_tx_id}`);
+    console.log(`Batch total: ${totalInBatch}, paid in ${paid_in_tx_id}`);
     await prompt('Press [ENTER] to save');
     await saveRebates(
       payoutBatch.map((s) => {

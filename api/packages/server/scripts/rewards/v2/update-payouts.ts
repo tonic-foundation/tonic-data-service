@@ -13,7 +13,7 @@
 import { parse } from 'ts-command-line-args';
 import { getDbConnectConfig } from '../../../src/config';
 import getConnection from 'knex';
-import { prompt } from '../../util';
+import { batch, prompt } from '../../util';
 
 const knex = getConnection(getDbConnectConfig());
 
@@ -31,7 +31,7 @@ export const args = parse<CliOptions>({
 
 interface PayoutsParams {
   reward_date: string;
-  paid_in_tx_id: string;
+  paid_in_tx_id: string | null;
 }
 
 // same as in the rewards/v2/leaderboad route (TODO: refactor)
@@ -61,11 +61,8 @@ interface Payout {
   paid_in_tx_id: string;
   source?: 'lp_reward' | 'raffle';
 }
-async function getPayouts(params: PayoutsParams) {
-  const { rows: payouts } = await knex.raw<{ rows: Payout[] }>(
-    PAYOUTS_QUERY,
-    params as unknown as Record<string, string>
-  );
+async function getPayouts(params: { reward_date: string }) {
+  const { rows: payouts } = await knex.raw<{ rows: Payout[] }>(PAYOUTS_QUERY, params);
   return payouts;
 }
 
@@ -134,52 +131,59 @@ function pickRaffleWinners(payouts: Payout[]): Payout[] {
 }
 
 async function run() {
-  const _optsFromArgs = { ...args };
-  delete _optsFromArgs['dry-run'];
+  const payouts = await getPayouts(args);
 
-  // TODO: this type is wrong, needs to be split into 2. getPayouts is receiving
-  // an extra property (paid_in_tx_id)
-  const opts = {
-    ..._optsFromArgs,
-  } as PayoutsParams;
-
-  const payouts = await getPayouts(opts);
   const totalLpRewards = payouts.reduce((acc, cur) => acc + parseFloat(cur.payout), 1);
   const raffleWinners = pickRaffleWinners(payouts);
 
   // print csvs, makes it easier to do the payouts
   console.log(`LP REWARDS (TOTAL: ${totalLpRewards})\n`);
-  console.log(payouts.map((p) => [p.account_id, p.payout].join(',')).join('\n'), '\n');
 
   console.log('RAFFLE WINNERS\n');
   console.log(raffleWinners.map((p) => [p.account_id, '25'].join(',')).join('\n'));
-  console.log('\n');
+  console.log();
+
+  // save the payouts in batches; nearsend can only send to about 20 accounts per tx
+  // before it starts batching. It's easier to handle if we batch in this script.
+
+  // print out all batches at the start
+  const batches = batch(payouts, 20);
+
+  batches.forEach((payoutBatch, i) => {
+    const batchTotal = payoutBatch.reduce((acc, cur) => acc + parseFloat(cur.payout), 1);
+    console.log(`Batch ${i + 1}/${batches.length} ${batchTotal}\n`);
+    console.log(payoutBatch.map((p) => [p.account_id, p.payout].join(',')).join('\n'), '\n');
+  });
 
   if (args['dry-run']) {
     console.log('Skip saving due to dry run');
-  } else {
-    // save the payouts
-
-    // wait for LP payment
-    while (!opts.paid_in_tx_id) {
-      opts.paid_in_tx_id = await prompt('LP payment TX ID: ');
-    }
-
-    console.log(`Total: ${totalLpRewards}, paid in ${opts.paid_in_tx_id}`);
-    await prompt('Press [ENTER] to save');
-
-    console.log('saving lp rewards');
-    await savePayouts(payouts.map((p) => ({ ...p, source: 'lp_reward', paid_in_tx_id: opts.paid_in_tx_id })));
-
-    // wait for raffle payment
-    let raffle_payout_tx_id = '';
-    while (!raffle_payout_tx_id.length) {
-      raffle_payout_tx_id = await prompt('Raffle payment TX ID: ');
-    }
-    console.log('saving raffle winners', raffleWinners, 'paid in', raffle_payout_tx_id);
-    await prompt('Press [ENTER] to save');
-    await savePayouts(raffleWinners.map((p) => ({ ...p, paid_in_tx_id: raffle_payout_tx_id })));
+    return;
   }
+
+  for (const [i, payoutBatch] of batches.entries()) {
+    const batchTotal = payoutBatch.reduce((acc, cur) => acc + parseFloat(cur.payout), 1);
+
+    let paid_in_tx_id: string | undefined;
+    while (!paid_in_tx_id) {
+      paid_in_tx_id = await prompt(`LP payment TX ID (Batch ${i + 1}/${batches.length}), "skip" to skip: `);
+    }
+    if (paid_in_tx_id.toLowerCase() === 'skip') {
+      console.log('skipping');
+    } else {
+      console.log(`Batch total: ${batchTotal}, paid in ${paid_in_tx_id}`);
+      await prompt('Press [ENTER] to save');
+      await savePayouts(payoutBatch.map((p) => ({ ...p, source: 'lp_reward', paid_in_tx_id: paid_in_tx_id! })));
+    }
+  }
+
+  // wait for raffle payment
+  let raffle_payout_tx_id = '';
+  while (!raffle_payout_tx_id.length) {
+    raffle_payout_tx_id = await prompt('Raffle payment TX ID: ');
+  }
+  console.log('saving raffle winners', raffleWinners, 'paid in', raffle_payout_tx_id);
+  await prompt('Press [ENTER] to save');
+  await savePayouts(raffleWinners.map((p) => ({ ...p, source: 'raffle', paid_in_tx_id: raffle_payout_tx_id })));
 }
 
 run().then(() => {
