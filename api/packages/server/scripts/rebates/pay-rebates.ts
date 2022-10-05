@@ -8,7 +8,7 @@
 import { parse } from 'ts-command-line-args';
 import { getDbConnectConfig } from '../../src/config';
 import getConnection from 'knex';
-import { prompt } from '../util';
+import { batch, prompt } from '../util';
 import { RebateSummary } from '../../src/routes/rebates/v1/summary';
 
 const knex = getConnection(getDbConnectConfig());
@@ -74,15 +74,19 @@ async function run() {
 
   // print csvs, makes it easier to do the payouts
   const totalOutstanding = summaries.reduce((acc, c) => acc + parseFloat(c.outstanding), 0);
-  console.log(`Outstanding payouts: ${totalOutstanding}\n`);
-  console.log(summaries.map((s) => [s.account_id, s.outstanding].join(',')).join('\n'), '\n');
+  console.log(`Total outstanding payouts: ${totalOutstanding}\n`);
 
-  if (args['dry-run']) {
-    console.log('Skip saving due to dry run');
-  } else {
-    // save the payouts
+  // save the payouts in batches (nearsend can only send so many at a time, about 20 or so)
+  const batches = batch(summaries);
+  for (const [i, payoutBatch] of batches.entries()) {
+    console.log(`Batch ${i + 1} / ${batches.length}`);
+    console.log(payoutBatch.map((s) => [s.account_id, s.outstanding].join(',')).join('\n'), '\n');
 
-    // wait for LP payment
+    if (args['dry-run']) {
+      console.log('skipped saving due to dry run\n');
+      continue;
+    }
+
     let paid_in_tx_id: string | undefined;
     while (!paid_in_tx_id) {
       paid_in_tx_id = await prompt('payment TX ID: ');
@@ -90,10 +94,8 @@ async function run() {
 
     console.log(`Total: ${totalOutstanding}, paid in ${paid_in_tx_id}`);
     await prompt('Press [ENTER] to save');
-
-    console.log('saving rebate payouts');
     await saveRebates(
-      summaries.map((s) => {
+      payoutBatch.map((s) => {
         return {
           account_id: s.account_id,
           amount: s.outstanding,

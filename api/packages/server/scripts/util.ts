@@ -28,3 +28,16 @@ export function prompt(query: string): Promise<string> {
     })
   );
 }
+
+/**
+ * Batch into n-sized buckets. Use for (eg) batching payouts for nearsend.
+ *
+ * NB: return is array of (array of) references, be careful mutating.
+ */
+export function batch<T>(xs: T[], n = 20): T[][] {
+  const batches: T[][] = [];
+  for (let i = 0; i < xs.length; i += n) {
+    batches.push(xs.slice(i, i + n));
+  }
+  return batches;
+}
