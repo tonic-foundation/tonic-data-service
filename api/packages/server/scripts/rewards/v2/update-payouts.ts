@@ -29,11 +29,6 @@ export const args = parse<CliOptions>({
   reward_date: { type: String },
 });
 
-interface PayoutsParams {
-  reward_date: string;
-  paid_in_tx_id: string | null;
-}
-
 // same as in the rewards/v2/leaderboad route (TODO: refactor)
 const PAYOUTS_QUERY = `
 select

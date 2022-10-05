@@ -14,6 +14,7 @@ import {
   coinMarketCapV1Routes,
   leaderboardRoutes,
   makeTvRouter,
+  monitoringRoutes,
   rebatesV1Routes,
   rewardsV1Routes,
   rewardsV2Routes,
@@ -61,6 +62,8 @@ server.register(marketUtilsPlugin); // must be after db/cache
 /**
  * Routes
  */
+server.register(monitoringRoutes, { prefix: '/monitoring' });
+
 server.register(apiV1Routes, { prefix: '/api/v1' });
 server.register(makeTvRouter('Tonic'), { prefix: '/tv' });
 

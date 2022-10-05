@@ -137,7 +137,7 @@ async function run() {
 
   const ob = await getOrderbook(account);
   if (args['dry-run']) {
-    console.log(ob)
+    console.log(ob);
   } else {
     await saveRolloverPoints(ob, args.date);
   }
