@@ -4,20 +4,10 @@
 // used in /leaderboard
 import { FastifyInstance } from 'fastify';
 
-export interface RebateSummary {
+export interface RebatePayout {
   account_id: string;
-  total_paid: string;
-  total_eligible: string;
-  outstanding: string;
-}
-
-function defaultSummary(account_id: string): RebateSummary {
-  return {
-    account_id,
-    total_eligible: '0',
-    total_paid: '0',
-    outstanding: '0',
-  };
+  amount: string;
+  paid_in_tx_id: string | null;
 }
 
 export default function (server: FastifyInstance, _: unknown, done: () => unknown) {
@@ -27,7 +17,7 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
       account: string;
     };
   }>({
-    url: '/summary',
+    url: '/history',
     method: 'GET',
     schema: {
       querystring: {
@@ -46,16 +36,12 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
 
       const { knex } = server;
 
-      const { rows } = await knex.raw<{ rows: RebateSummary[] }>(
-        `select * from fee_rebates.rebate_summary where account_id = :account`,
+      const { rows } = await knex.raw<{ rows: RebatePayout[] }>(
+        `select * from fee_rebates.rebates where account_id = :account order by paid_at desc`,
         { account }
       );
 
-      if (!rows.length) {
-        resp.status(200).send(defaultSummary(account));
-      } else {
-        resp.status(200).send(rows[0]);
-      }
+      resp.status(200).send(rows);
     },
   });
 

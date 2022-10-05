@@ -2,6 +2,13 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 
+const {
+  /**
+   * Disable caching in `server.withCache`
+   */
+  TONIC_DATA_SERVICE_API_DISABLE_CACHE,
+} = process.env;
+
 export interface CacheService {
   set<T = any>(k: string, v: T): T | undefined;
   get<T = any>(k: string): T | undefined;
@@ -61,7 +68,7 @@ function cachePlugin(fastify: FastifyInstance, _: unknown, next: () => unknown) 
     const { key, get, ttl } = opts;
     let ret = ttl ? fastify.cache.getTimed(key) : fastify.cache.get(key);
 
-    if (!ret) {
+    if (!ret || !!TONIC_DATA_SERVICE_API_DISABLE_CACHE) {
       ret = await get();
       if (ttl) {
         fastify.cache.setTimed(key, ret, ttl);

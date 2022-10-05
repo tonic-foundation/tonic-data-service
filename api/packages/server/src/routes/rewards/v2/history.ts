@@ -36,7 +36,7 @@ export interface RewardEntry {
   total: number;
   points: number;
   payout: number;
-  source: 'lp_reward' | 'raffle';
+  source: 'lp_reward' | 'raffle' | 'correction';
   reward_date: Date;
   paid_in_tx_id: string | null;
 }
