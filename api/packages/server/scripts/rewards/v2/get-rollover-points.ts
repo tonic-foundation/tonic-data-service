@@ -136,7 +136,11 @@ async function run() {
   // const tonic = new Tonic(account, TONIC_CONTRACT_ID);
 
   const ob = await getOrderbook(account);
-  await saveRolloverPoints(ob, args.date);
+  if (args['dry-run']) {
+    console.log(ob)
+  } else {
+    await saveRolloverPoints(ob, args.date);
+  }
 }
 
 run().then(() => {
