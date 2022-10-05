@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 
-interface IndexerStats {
+export interface IndexerProcessedBlock {
   latest_block_height: number;
   processed_at: Date;
   seconds_since: number;
@@ -27,7 +27,7 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
     // http handler used for polling/fetching initial list of requests when populating a ui
     handler: async (_, response) => {
       const { knex } = server;
-      const { rows } = await knex.raw<{ rows: IndexerStats[] }>(QUERY);
+      const { rows } = await knex.raw<{ rows: IndexerProcessedBlock[] }>(QUERY);
 
       response.status(200).send(rows[0]);
     },
