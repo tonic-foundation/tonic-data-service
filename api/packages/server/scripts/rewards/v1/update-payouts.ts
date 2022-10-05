@@ -10,7 +10,7 @@
 import { parse } from 'ts-command-line-args';
 import { getDbConnectConfig } from '../../../src/config';
 import getConnection from 'knex';
-import { prompt } from '../util';
+import { prompt } from '../../util';
 
 const knex = getConnection(getDbConnectConfig());
 
