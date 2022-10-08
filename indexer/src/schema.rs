@@ -1,4 +1,6 @@
-table! {
+// @generated automatically by Diesel CLI.
+
+diesel::table! {
     cancel_event (id) {
         id -> Int4,
         receipt_id -> Text,
@@ -11,7 +13,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     fill_event (id) {
         id -> Int4,
         receipt_id -> Text,
@@ -29,14 +31,14 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     indexer_processed_block (block_height) {
         block_height -> Int4,
         processed_at -> Nullable<Timestamp>,
     }
 }
 
-table! {
+diesel::table! {
     market (id) {
         id -> Text,
         symbol -> Text,
@@ -51,7 +53,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     market_event (id) {
         id -> Int4,
         receipt_id -> Text,
@@ -62,7 +64,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     nep_141_token (id) {
         id -> Varchar,
         spec -> Nullable<Text>,
@@ -78,7 +80,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     order_event (id) {
         id -> Int4,
         receipt_id -> Text,
@@ -97,7 +99,7 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(
+diesel::allow_tables_to_appear_in_same_query!(
     cancel_event,
     fill_event,
     indexer_processed_block,
