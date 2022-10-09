@@ -5,7 +5,7 @@
 begin
 ;
 
-create type rewards.payout_source as enum('lp_reward', 'raffle');
+create type rewards.payout_source as enum('lp_reward', 'raffle', 'correction');
 
 alter table
     rewards.payouts
@@ -136,10 +136,14 @@ create view rewards.points_v2_inputs as (
             24
         ) as eligible_hours_on_book
     from
-        limit_order_events o
-        cross join rewards.const const
+        limit_order_events o -- cross join rewards.const const
     where
-        event_ts > const.start_date
+        event_ts > (
+            select
+                start_date
+            from
+                rewards.const
+        )
 );
 
 -- currently unused, but gives liquidity hours per order
@@ -195,7 +199,6 @@ multipliers as (
         end fill_multiplier
     from
         distance
-        cross join rewards.const const
 )
 select
     -- dollar hours x multipliers
@@ -240,7 +243,6 @@ create view rewards.usn_rewards_calculator_v2 as (
     ),
     points_calculator as (
         select
-            market_id,
             account_id,
             event_date,
             -- NOTE: the time divisor has been removed, since it has no effect on
@@ -261,9 +263,14 @@ create view rewards.usn_rewards_calculator_v2 as (
             multipliers m
             join rewards.params p on m.event_date = p.reward_date
         where
-            eligible -- this used to be a multiplier but is a boolean now
+            market_id = (
+                select
+                    usn_usdc_market_id
+                from
+                    rewards.const
+            )
+            and eligible -- this used to be a multiplier but is a boolean now
         group by
-            market_id,
             account_id,
             event_date
     )
@@ -273,9 +280,6 @@ create view rewards.usn_rewards_calculator_v2 as (
         points
     from
         points_calculator
-        cross join rewards.const const
-    where
-        market_id = const.usn_usdc_market_id
 );
 
 -- get shares for a given day, accounting for rollover points
