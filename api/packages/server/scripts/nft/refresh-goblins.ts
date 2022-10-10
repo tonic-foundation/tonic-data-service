@@ -77,9 +77,15 @@ async function run() {
   console.log(accounts.length, 'accounts to check');
 
   for (const id of accounts) {
-    const res: unknown[] = await account.viewFunction(NFT_CONTRACT_ID, 'nft_tokens_for_owner', {
-      account_id: id,
-    });
+    let res: unknown[] = [];
+    try {
+      res = await account.viewFunction(NFT_CONTRACT_ID, 'nft_tokens_for_owner', {
+        account_id: id,
+      });
+    } catch (e) {
+      console.error('Error getting for account', id, e);
+      continue;
+    }
     const held = res.length;
     const multiplier = getMultiplier(held);
 

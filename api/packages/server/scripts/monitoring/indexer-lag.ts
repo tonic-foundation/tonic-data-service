@@ -37,7 +37,7 @@ async function getLatestBlock(): Promise<IndexerProcessedBlock> {
 async function run() {
   const latest = await getLatestBlock();
 
-  console.table(latest)
+  console.table(latest);
 
   const threshold = parseInt(TONIC_DATA_SERVICE_INDEXER_ALERT_THRESHOLD);
   if (latest.seconds_since > threshold) {
