@@ -136,9 +136,15 @@ create view rewards.points_v2_inputs as (
             24
         ) as eligible_hours_on_book
     from
-        limit_order_events o -- cross join rewards.const const
+        limit_order_events o
     where
-        event_ts > (
+        market_id = (
+            select
+                usn_usdc_market_id
+            from
+                rewards.const
+        )
+        and event_ts > (
             select
                 start_date
             from
@@ -210,8 +216,6 @@ select
     -- 5 * 2 * 1 = 2400 points. Most people are placing bigger orders and
     -- getting filled; eg., top trader from 2022-09-19 had around 300k points.
     -- Scaling down makes each point feel a bit more substantial.
-    --
-    -- for some reason, a cross join on rewards here slows things to a crawl, so one_usn is hard coded
     coalesce(
         -- NOTE: side boost has been removed, way too strong
         -- 18 zeroes for one usn
