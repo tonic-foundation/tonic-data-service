@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel::result::QueryResult;
@@ -35,6 +37,7 @@ pub struct NewCancelEvent {
     refund_token: String,
     cancelled_qty: String,
     created_at: NaiveDateTime,
+    price_rank: i32,
 }
 
 pub fn save_new_cancel_event<'a>(
@@ -53,6 +56,7 @@ pub fn save_new_cancel_event<'a>(
             refund_amount: c.refund_amount.0.to_string(),
             refund_token: c.refund_token.key(),
             cancelled_qty: c.cancelled_qty.0.to_string(),
+            price_rank: c.price_rank.0.try_into().expect("price rank overflow"),
             created_at,
         })
         .collect();
@@ -80,6 +84,7 @@ pub struct NewFillEvent {
     is_bid: bool,
     taker_account_id: String,
     maker_account_id: String,
+    maker_price_rank: i32,
 }
 
 pub fn save_new_fill_event<'a>(
@@ -104,6 +109,11 @@ pub fn save_new_fill_event<'a>(
             is_bid: f.side == Side::Buy,
             taker_account_id: f.taker_account_id.to_string(),
             maker_account_id: f.maker_account_id.to_string(),
+            maker_price_rank: f
+                .maker_price_rank
+                .0
+                .try_into()
+                .expect("maker price rank overflow"),
             created_at,
         })
         .collect();
@@ -162,6 +172,8 @@ pub struct NewOrderEvent {
     referrer_id: Option<String>,
     referrer_rebate: String,
     is_swap: bool,
+    /// Price rank of a newly posted order. -1 if the order didn't post.
+    price_rank: i32,
 }
 
 pub fn save_new_order_event<'a>(
@@ -184,6 +196,10 @@ pub fn save_new_order_event<'a>(
         referrer_rebate: ev.referrer_rebate.0.to_string(),
         created_at,
         is_swap: ev.is_swap,
+        price_rank: ev
+            .price_rank
+            .map(|r| r.0.try_into().expect("price rank overflow"))
+            .unwrap_or(-1),
     };
 
     diesel::insert_into(schema::order_event::table)

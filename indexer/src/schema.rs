@@ -10,6 +10,7 @@ diesel::table! {
         refund_amount -> Text,
         refund_token -> Text,
         cancelled_qty -> Nullable<Text>,
+        price_rank -> Nullable<Int4>,
     }
 }
 
@@ -28,6 +29,7 @@ diesel::table! {
         is_bid -> Bool,
         taker_account_id -> Text,
         maker_account_id -> Text,
+        maker_price_rank -> Nullable<Int4>,
     }
 }
 
@@ -96,6 +98,7 @@ diesel::table! {
         referrer_rebate -> Text,
         referrer_id -> Nullable<Text>,
         is_swap -> Nullable<Bool>,
+        price_rank -> Nullable<Int4>,
     }
 }
 
