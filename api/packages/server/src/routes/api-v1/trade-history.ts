@@ -19,6 +19,7 @@ interface Trade {
    */
   volume: number;
   direction: 'Buy' | 'Sell';
+  client_id: string | null;
 }
 
 const HISTORY_QUERY = `
@@ -27,7 +28,8 @@ const HISTORY_QUERY = `
     f.fill_price as price,
     f.quote_qty as volume,
     o.order_id,
-    o.side as raw_side
+    o.side as raw_side,
+    o.client_id
 from fill_event f
 join order_event o
 on (
@@ -85,6 +87,7 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
           created_at: new Date(data.created_at),
           direction: data.raw_side === 'sell' ? 'Sell' : 'Buy',
           order_id: data.order_id,
+          client_id: data.client_id,
           price: priceStringToNumber(data.price)!,
           quantity: quantityStringToNumber(data.quantity)!,
           volume: priceStringToNumber(data.volume)!,

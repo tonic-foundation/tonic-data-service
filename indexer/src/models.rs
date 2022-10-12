@@ -56,7 +56,7 @@ pub fn save_new_cancel_event<'a>(
             refund_amount: c.refund_amount.0.to_string(),
             refund_token: c.refund_token.key(),
             cancelled_qty: c.cancelled_qty.0.to_string(),
-            price_rank: c.price_rank.0.try_into().expect("price rank overflow"),
+            price_rank: c.price_rank.try_into().expect("price rank overflow"),
             created_at,
         })
         .collect();
@@ -111,7 +111,6 @@ pub fn save_new_fill_event<'a>(
             maker_account_id: f.maker_account_id.to_string(),
             maker_price_rank: f
                 .maker_price_rank
-                .0
                 .try_into()
                 .expect("maker price rank overflow"),
             created_at,
@@ -173,7 +172,11 @@ pub struct NewOrderEvent {
     referrer_rebate: String,
     is_swap: bool,
     /// Price rank of a newly posted order. -1 if the order didn't post.
+    /// OK for this to be i32, as OB should never have billions of price levels.
     price_rank: i32,
+    /// Client ID is u32 in the contract, so we conceivably need larger than i32
+    /// (ie, postgres integer) for this field.
+    client_id: Option<i64>,
 }
 
 pub fn save_new_order_event<'a>(
@@ -198,8 +201,11 @@ pub fn save_new_order_event<'a>(
         is_swap: ev.is_swap,
         price_rank: ev
             .price_rank
-            .map(|r| r.0.try_into().expect("price rank overflow"))
+            .map(|r| r.try_into().expect("price rank overflow"))
             .unwrap_or(-1),
+        client_id: ev
+            .client_id
+            .map(|id| id.try_into().expect("unknown client id error")),
     };
 
     diesel::insert_into(schema::order_event::table)

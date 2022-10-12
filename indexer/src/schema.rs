@@ -99,6 +99,7 @@ diesel::table! {
         referrer_id -> Nullable<Text>,
         is_swap -> Nullable<Bool>,
         price_rank -> Nullable<Int4>,
+        client_id -> Nullable<Int8>,
     }
 }
 
