@@ -45,6 +45,7 @@
     "@tonic-foundation/tonic": "^0.0.13",
     "@tonic-foundation/utils": "^0.0.2",
     "bn.js": "^5.2.0",
+    "date-fns": "^2.29.3",
     "fastify": "^3.27.1",
     "fastify-plugin": "^3.0.1",
     "fastify-websocket": "^4.0.0",

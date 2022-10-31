@@ -66,7 +66,7 @@ function intoHistory(entries: RewardEntry[]): RewardsHistory {
         payout: e.payout,
         // server is assumed to be in UTC
         source: e.source,
-        points: e.points,
+        // points: e.points, // TODO: didnt finish implementing this
         reward_date: e.reward_date.toISOString().split('T')[0],
         paid_in_tx_id: e.paid_in_tx_id,
       };

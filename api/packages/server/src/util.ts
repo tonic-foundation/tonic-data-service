@@ -3,9 +3,12 @@ import { getNearConfig, NearEnv } from '@tonic-foundation/config';
 import { getConfig } from './config';
 import { Tonic } from '@tonic-foundation/tonic';
 
-export function maybeDate(s: string): Date | null {
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
+export function maybeDate(s?: string): Date | null {
+  if (s) {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
 }
 
 let _nobody: Account | undefined;
