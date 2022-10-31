@@ -1,4 +1,3 @@
-// is the account eligible to earn rewards
 import { FastifyInstance } from 'fastify';
 
 const ELIGIBILITY_QUERY = `
@@ -12,11 +11,6 @@ const ELIGIBILITY_QUERY = `
     )::int
   );
 `;
-
-export interface RewardsProgramParameters {
-  start_date: string;
-  end_date: string;
-}
 
 export default function (server: FastifyInstance, _: unknown, done: () => unknown) {
   server.route<{
