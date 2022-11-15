@@ -16,7 +16,7 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
         key: 'api-v1-supported-tokens',
         ttl: 15 * 60_000,
         async get() {
-          return await server.knex<Nep141Token>('nep_141_token').select('id');
+          return await server.knex<Nep141Token>('nep_141_token').select('id').where('visible', true);
         },
       });
       response.status(200).send({ tokens });

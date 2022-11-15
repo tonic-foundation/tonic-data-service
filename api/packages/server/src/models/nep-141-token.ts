@@ -9,4 +9,5 @@ export interface Nep141Token {
   spec: 'ft-1.0.0';
   reference: string | null;
   reference_hash: string | null;
+  visible?: boolean;
 }
