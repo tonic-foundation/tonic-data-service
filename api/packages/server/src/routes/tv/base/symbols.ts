@@ -79,17 +79,19 @@ export default function makeSymbolsHandler(exchangeName: string) {
       handler: async (request, response) => {
         const { symbol } = request.query;
 
-        const key = `symbol-${symbol}`;
-        let info: BasicInfo | undefined = server.cache.get(key);
-        if (!info) {
-          const { rows } = await server.knex.raw<{ rows: BasicInfo[] }>(BASIC_INFO_QUERY, {
-            symbol: symbol.toLowerCase(),
-          });
-          if (rows.length) {
-            info = rows[0];
-            server.cache.set(key, info);
-          }
-        }
+        const info = await server.withCache({
+          key: `tv-symbol-${symbol}`,
+          ttl: 60_000,
+          async get() {
+            const { rows } = await server.knex.raw<{ rows: BasicInfo[] }>(BASIC_INFO_QUERY, {
+              symbol: symbol.toLowerCase(),
+            });
+            if (rows.length) {
+              return rows[0];
+            }
+            return;
+          },
+        });
 
         if (info) {
           const pricescale = Number(info.pricescale);

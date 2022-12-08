@@ -119,15 +119,16 @@ export default function (server: FastifyInstance, _: unknown, done: () => unknow
       }
 
       const symbol = rawSymbol.toLowerCase();
-      const cacheKey = `tv-history-${symbol}`;
+      const meta = await server.withCache({
+        key: `tv-history-meta-${symbol}`,
+        ttl: 60_000,
+        async get() {
+          return await knex<MarketInfo>('market')
+            .where('symbol', symbol)
+            .first('id', 'quote_decimals', 'base_decimals');
+        },
+      });
 
-      let meta = server.cache.get<MarketPriceMetadata>(cacheKey);
-      if (!meta) {
-        meta = await knex<MarketInfo>('market')
-          .where('symbol', symbol.toLowerCase())
-          .first('id', 'quote_decimals', 'base_decimals');
-        server.cache.set(cacheKey, meta);
-      }
       // if it's still not found, it didn't exist in db at all
       if (!meta) {
         response.status(404);
