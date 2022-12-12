@@ -213,7 +213,14 @@ or replace function rewards.get_lp_shares_v3(_symbol text, _date date) returns t
         from
             rewards.liquidity_hours_v3 l
         where
-            market_id = (
+            exists (
+                select
+                    from
+                rewards.eligible_account ea
+                    where
+                ea.account_id = l.account_id
+            )
+            and market_id = (
                 select
                     market_id
                 from
