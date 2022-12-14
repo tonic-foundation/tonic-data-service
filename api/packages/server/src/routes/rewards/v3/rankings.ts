@@ -11,7 +11,7 @@ select
 from
   rewards.get_lp_rewards_v3(:symbol, :date)
 where
-  share > 0.001
+  share > 0.0005
 order by ranking;
 `;
 
