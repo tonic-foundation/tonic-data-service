@@ -1,15 +1,25 @@
 import { FastifyInstance } from 'fastify';
 
+// TODO: refactor
 const REWARDS_TODAY_QUERY = `
 select
-  dense_rank() over (order by account_liquidity_hours desc, account_id) ranking,
-  account_id,
-  account_liquidity_hours,
-  total_liquidity_hours,
-  share,
-  reward
+  dense_rank() over (order by r.account_liquidity_hours desc, r.account_id) ranking,
+  r.account_id,
+  r.account_liquidity_hours,
+  r.total_liquidity_hours,
+  r.share,
+  r.reward,
+  p.paid_in_tx_id
 from
-  rewards.get_lp_rewards_v3(:symbol, :date)
+  rewards.get_lp_rewards_v3(:symbol, :date) r
+join
+  rewards.eligible_market_v3 em
+  on em.symbol = :symbol
+left join
+  rewards.payout_v3 p
+  on p.account_id = r.account_id
+  and p.market_id = em.market_id
+  and p.reward_date = :date
 where
   share > 0.0005
 order by ranking;
@@ -22,6 +32,7 @@ interface Ranking {
   total_liquidity_hours: number;
   share: number;
   reward: number;
+  paid_in_tx_id: string | null;
 }
 
 interface GroupedRankings {
@@ -35,6 +46,7 @@ function stripTotal(r: Ranking): Omit<Ranking, 'ranking' | 'total_liquidity_hour
     account_liquidity_hours: r.account_liquidity_hours,
     reward: r.reward,
     share: r.share,
+    paid_in_tx_id: r.paid_in_tx_id,
   };
 }
 
