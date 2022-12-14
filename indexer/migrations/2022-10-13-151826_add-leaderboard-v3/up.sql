@@ -26,6 +26,21 @@ from
 where
     symbol like '%usdc';
 
+create
+or replace function rewards.is_eligible_account_v3(_account_id text, _symbol_unused text) returns boolean language plpgsql as $$ begin
+    return case
+        when _account_id like '%.cellfi-prod.near' then true
+        else exists (
+            select
+            from
+                rewards.eligible_account ea
+            where
+                ea.account_id = _account_id
+        )
+    end eligible;
+
+end $$;
+
 -- There's no payout v2 because we didn't make a new one for leaderboard v2.
 -- Going forward, all versions will match.
 create table rewards.payout_v3 as (
@@ -213,13 +228,7 @@ or replace function rewards.get_lp_shares_v3(_symbol text, _date date) returns t
         from
             rewards.liquidity_hours_v3 l
         where
-            exists (
-                select
-                    from
-                rewards.eligible_account ea
-                    where
-                ea.account_id = l.account_id
-            )
+            rewards.is_eligible_account_v3(l.account_id, 'unused')
             and market_id = (
                 select
                     market_id
