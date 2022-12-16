@@ -29,8 +29,8 @@ export const args = parse<CliOptions>({
   'dry-run': { type: Boolean, optional: true },
 });
 
-async function getParticipants(): Promise<string[]> {
-  const rows = await knex('rewards.signup').distinct('account_id');
+async function getUsers(): Promise<string[]> {
+  const rows = await knex('nft.nft_holder').distinct('account_id');
   return rows.map((row: { account_id: string }) => row.account_id);
 }
 
@@ -73,7 +73,7 @@ async function run() {
   });
   const account = await near.account('dontcare');
 
-  const accounts = await getParticipants();
+  const accounts = await getUsers();
   console.log(accounts.length, 'accounts to check');
 
   for (const id of accounts) {
