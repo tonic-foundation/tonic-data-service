@@ -38,6 +38,8 @@ pub struct NewCancelEvent {
     cancelled_qty: String,
     created_at: NaiveDateTime,
     price_rank: i32,
+    best_bid: Option<String>,
+    best_ask: Option<String>,
 }
 
 pub fn save_new_cancel_event<'a>(
@@ -53,6 +55,8 @@ pub fn save_new_cancel_event<'a>(
             receipt_id: receipt_id.clone(),
             market_id: base58_encode(&ev.market_id.into()),
             order_id: base58_encode(&c.order_id.into()),
+            best_ask: c.best_ask.map(|p| p.0.to_string()),
+            best_bid: c.best_bid.map(|p| p.0.to_string()),
             refund_amount: c.refund_amount.0.to_string(),
             refund_token: c.refund_token.key(),
             cancelled_qty: c.cancelled_qty.0.to_string(),

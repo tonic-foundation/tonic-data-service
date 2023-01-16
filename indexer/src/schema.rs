@@ -11,6 +11,8 @@ diesel::table! {
         refund_token -> Text,
         cancelled_qty -> Nullable<Text>,
         price_rank -> Nullable<Int4>,
+        best_bid -> Nullable<Text>,
+        best_ask -> Nullable<Text>,
     }
 }
 
