@@ -28,4 +28,4 @@ rand = { version = "0.8.5" }
 chrono = "0.4"
 diesel = { version = "1.4.8", features = ["chrono", "postgres", "r2d2"] }
 
-tonic-sdk = { git = "https://github.com/tonic-foundation/tonic-sdk-rs.git", rev = "16b76de6ac04a742dd232ffc1b6f89e8a291e8a5" }
+tonic-sdk = { git = "https://github.com/tonic-foundation/tonic-sdk-rs.git", rev = "8fd832df9ad1d0b50c53b5baaa64479cb8a3e92e" }

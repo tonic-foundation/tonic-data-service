@@ -100,6 +100,9 @@ diesel::table! {
         is_swap -> Nullable<Bool>,
         price_rank -> Nullable<Int4>,
         client_id -> Nullable<Int8>,
+        best_bid -> Nullable<Text>,
+        best_ask -> Nullable<Text>,
+        open_quantity -> Nullable<Text>,
     }
 }
 
