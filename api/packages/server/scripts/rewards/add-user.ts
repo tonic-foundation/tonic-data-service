@@ -22,6 +22,7 @@ async function saveUser(account_ids: string[]) {
     await knex.transaction(async (t) => {
       for (const account_id of account_ids) {
         await t('rewards.signup').insert({ account_id }).onConflict('account_id').ignore();
+        await t('nft.nft_holder').insert({ account_id }).onConflict('account_id').ignore();
       }
     });
   } catch (err) {
