@@ -238,6 +238,7 @@ or replace function rewards.get_lp_shares_v4(_symbol text, _date date) returns t
         where
             rewards.is_eligible_account_v4(l.account_id, 'unused')
         group by
+            l.market_id,
             l.account_id
     ),
     total as (
