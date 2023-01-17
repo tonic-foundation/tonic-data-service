@@ -60,7 +60,7 @@ or replace function rewards.is_eligible_account_v4(_account_id text, _symbol_unu
 end $$;
 
 -- migrate from v3
-create table rewards.payout_v4 as (
+create table if not exists rewards.payout_v4 as (
     select
         *
     from
@@ -222,6 +222,7 @@ end $$;
 
 create
 or replace function rewards.get_lp_shares_v4(_symbol text, _date date) returns table (
+    market_id text,
     account_id text,
     account_liquidity_hours float,
     total_liquidity_hours float,
@@ -229,6 +230,7 @@ or replace function rewards.get_lp_shares_v4(_symbol text, _date date) returns t
 ) language plpgsql as $$ begin
     return query with liquidity_hours as (
         select
+            l.market_id,
             l.account_id,
             sum(l.liquidity_hours * l.price_multiplier) account_liquidity_hours
         from
