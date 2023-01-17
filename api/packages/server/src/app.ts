@@ -19,6 +19,7 @@ import {
   rewardsV1Routes,
   rewardsV2Routes,
   rewardsV3Routes,
+  rewardsV4Routes,
 } from './routes';
 
 const config = getConfig();
@@ -73,6 +74,7 @@ server.register(leaderboardRoutes, { prefix: '/leaderboard' });
 server.register(rewardsV1Routes, { prefix: '/rewards/v1' });
 server.register(rewardsV2Routes, { prefix: '/rewards/v2' });
 server.register(rewardsV3Routes, { prefix: '/rewards/v3' });
+server.register(rewardsV4Routes, { prefix: '/rewards/v4' });
 
 server.register(rebatesV1Routes, { prefix: '/rebates/v1' });
 
