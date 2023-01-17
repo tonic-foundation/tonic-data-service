@@ -67,6 +67,11 @@ create table if not exists rewards.payout_v4 as (
         rewards.payout_v3
 );
 
+alter table
+    rewards.payout_v4
+add
+    constraint payout_uniqueness_v4 unique(account_id, reward_date, source, market_id);
+
 -- daily params/per-market params removed
 -- 'created' event removed (unused)
 create
